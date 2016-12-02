@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-// StatsReader reads uwsgi stats from specified uri
+// StatsReader reads uwsgi stats from specified uri.
 type StatsReader interface {
 	Read() ([]byte, error)
 }
@@ -27,7 +27,7 @@ func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 	case "http":
 	case "https":
 		reader := &HTTPStatsReader{
-			url: uri,
+			uri: uri,
 			client: &http.Client{
 				Transport: &http.Transport{
 					Dial: func(network, addr string) (net.Conn, error) {

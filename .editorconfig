@@ -1,0 +1,9 @@
+root = true
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[*.yml]
+indent_size = space
+indent_size = 2

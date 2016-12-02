@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -10,7 +11,8 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-type Exporter struct {
+// UWSGIExporter collects uwsgi metrics for prometheus.
+type UWSGIExporter struct {
 	mutex sync.RWMutex
 
 	uri         string
@@ -18,16 +20,11 @@ type Exporter struct {
 	statsReader StatsReader
 
 	scrapeDurations *prometheus.SummaryVec
-	up              *prometheus.GaugeVec
-	gaugesMap       GaugesMap
-	countersMap     CountersMap
+	descriptorsMap  DescriptorsMap
 }
 
-type Gauges map[string]*prometheus.GaugeVec
-type Counters map[string]*prometheus.CounterVec
-
-type GaugesMap map[string]Gauges
-type CountersMap map[string]Counters
+type Descriptors map[string]*prometheus.Desc
+type DescriptorsMap map[string]Descriptors
 
 const (
 	namespace = "uwsgi"
@@ -42,12 +39,19 @@ const (
 )
 
 var (
-	gaugeMetricsMap = map[string]map[string]string{
+	metricsMap = map[string]map[string]string{
 		mainSubsystem: map[string]string{
 			"listen_queue_length": "Length of listen queue.",
 			"listen_queue_errors": "Number of listen queue errors.",
 			"signal_queue_length": "Length of signal queue.",
 			"workers":             "Number of workers.",
+
+			"requests_total":          "Total number of requests.",
+			"exceptions_total":        "Total number of exceptions.",
+			"harakiri_count_total":    "Total number of harakiri count.",
+			"signals_total":           "Total number of signals.",
+			"respawn_count_total":     "Total number of respawn count.",
+			"transmitted_bytes_total": "Worker transmitted bytes.",
 		},
 
 		socketSubsystem: map[string]string{
@@ -70,32 +74,20 @@ var (
 
 		workerAppSubsystem: map[string]string{
 			"startup_time_seconds": "How long this app took to start.",
-		},
-	}
 
-	counterMetricsMap = map[string]map[string]string{
-		workerSubsystem: map[string]string{
-			"requests_total":          "Total number of requests.",
-			"exceptions_total":        "Total number of exceptions.",
-			"harakiri_count_total":    "Total number of harakiri count.",
-			"signals_total":           "Total number of signals.",
-			"respawn_count_total":     "Total number of respawn count.",
-			"transmitted_bytes_total": "Worker transmitted bytes.",
-		},
-
-		workerAppSubsystem: map[string]string{
 			"requests_total":   "Total number of requests.",
 			"exceptions_total": "Total number of exceptions.",
 		},
 
 		workerCoreSubsystem: map[string]string{
+			"in_requests": "In requests?",
+
 			"requests_total":           "Total number of requests.",
 			"static_requests_total":    "Total number of static requests.",
 			"routed_reqeusts_total":    "Total number of routed requests.",
 			"offloaded_requests_total": "Total number of offloaded requests.",
 			"write_errors_total":       "Total number of write errors.",
 			"read_errors_total":        "Total number of read errors.",
-			"in_requests_total":        "Total number of requests in.",
 		},
 	}
 
@@ -110,39 +102,15 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration) *Exporter {
-	gaugesMap := GaugesMap{}
-	countersMap := CountersMap{}
+func NewExporter(uri string, timeout time.Duration) *UWSGIExporter {
+	descriptorsMap := DescriptorsMap{}
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
-	for subsystem, gaugeMetrics := range gaugeMetricsMap {
-		gauges := Gauges{}
-		for name, help := range gaugeMetrics {
-			gauges[name] = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Namespace:   namespace,
-				Subsystem:   subsystem,
-				Name:        name,
-				Help:        help,
-				ConstLabels: constLabels,
-			}, labelsMap[subsystem])
+	for subsystem, metrics := range metricsMap {
+		descriptors := Descriptors{}
+		for name, help := range metrics {
+			descriptors[name] = prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, subsystem, name), help, labelsMap[subsystem], constLabels)
 		}
-
-		gaugesMap[subsystem] = gauges
-	}
-
-	for subsystem, counterMetrics := range counterMetricsMap {
-		counters := Counters{}
-		for name, help := range counterMetrics {
-			counters[name] = prometheus.NewCounterVec(prometheus.CounterOpts{
-				Namespace:   namespace,
-				Subsystem:   subsystem,
-				Name:        name,
-				Help:        help,
-				ConstLabels: constLabels,
-			}, labelsMap[subsystem])
-		}
-
-		countersMap[subsystem] = counters
 	}
 
 	statsReader, err := NewStatsReader(uri, timeout)
@@ -150,7 +118,7 @@ func NewExporter(uri string, timeout time.Duration) *Exporter {
 		log.Fatal(err)
 	}
 
-	return &Exporter{
+	return &UWSGIExporter{
 		uri:         uri,
 		timeout:     timeout,
 		statsReader: statsReader,
@@ -161,38 +129,25 @@ func NewExporter(uri string, timeout time.Duration) *Exporter {
 			Name:      "scrape_duration_seconds",
 			Help:      "uwsgi_exporter: Duration of a scrape job.",
 		}, []string{"result"}),
-		up: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:   namespace,
-			Name:        "up",
-			Help:        "Was uwsgi stats query successful?",
-			ConstLabels: constLabels,
-		}, labelsMap[mainSubsystem]),
-		gaugesMap:   gaugesMap,
-		countersMap: countersMap,
+		descriptorsMap: descriptorsMap,
 	}
 }
 
 // Describe describes all the metrics ever exported by the exporter.
 // It implements prometheus.Collector.
-func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+func (e *UWSGIExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.scrapeDurations.Describe(ch)
 
-	for _, vecs := range e.gaugesMap {
-		for _, vec := range vecs {
-			vec.Describe(ch)
-		}
-	}
-
-	for _, vecs := range e.countersMap {
-		for _, vec := range vecs {
-			vec.Describe(ch)
+	for _, descs := range e.descriptorsMap {
+		for _, desc := range descs {
+			ch <- desc
 		}
 	}
 }
 
 // Collect fetches the stats from configured uwsgi stats location and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
-func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+func (e *UWSGIExporter) Collect(ch chan<- prometheus.Metric) {
 	begin := time.Now()
 	err := e.execute(ch)
 	duration := time.Since(begin)
@@ -209,22 +164,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.scrapeDurations.WithLabelValues(result).Observe(duration.Seconds())
 }
 
-func (e *Exporter) execute(ch chan<- prometheus.Metric) error {
+func (e *UWSGIExporter) execute(ch chan<- prometheus.Metric) error {
 	e.mutex.Lock() // To prevent metrics from concurrent collects.
 	defer e.mutex.Unlock()
-
-	// Reset metrics.
-	for _, vecs := range e.gaugesMap {
-		for _, vec := range vecs {
-			vec.Reset()
-		}
-	}
-
-	for _, vecs := range e.countersMap {
-		for _, vec := range vecs {
-			vec.Reset()
-		}
-	}
 
 	// Read stats from uwsgi server
 	body, err := e.statsReader.Read()
@@ -237,98 +179,77 @@ func (e *Exporter) execute(ch chan<- prometheus.Metric) error {
 	err = json.Unmarshal(body, uwsgiStats)
 	if err != nil {
 		log.Errorf("Failed to unmarshal JSON into struct: %s", err)
-		e.setValueForUp(0)
 		return err
 	}
 
 	// Parse stats into metrics
-	e.parseStats(&uwsgiStats)
-
-	// Report metrics
-	for _, vecs := range e.gaugesMap {
-		for _, vec := range vecs {
-			vec.Collect(ch)
-		}
-	}
-
-	for _, vecs := range e.countersMap {
-		for _, vec := range vecs {
-			vec.Collect(ch)
-		}
-	}
+	e.collectStats(ch, &uwsgiStats)
 
 	return nil
 }
 
-func (e *Exporter) setValueForUp(v float64) {
-	e.up.WithLabelValues(e.uri).Set(v)
-}
-
-func (e *Exporter) parseStats(stats *UWSGIStats) {
+func (e *UWSGIExporter) collectStats(ch chan<- prometheus.Metric, stats *UWSGIStats) {
 	// Main
-	mainGauges := e.gaugesMap[mainSubsystem]
-	mainGauges["listen_queue_length"].WithLabelValues().Set(float64(stats.ListenQueue))
-	mainGauges["listen_queue_errors"].WithLabelValues().Set(float64(stats.ListenQueueErrors))
-	mainGauges["signal_queue_length"].WithLabelValues().Set(float64(stats.SignalQueue))
-	mainGauges["workers"].WithLabelValues().Set(float64(len(stats.Workers)))
+	mainDescs := e.descriptorsMap[mainSubsystem]
+	ch <- prometheus.MustNewConstMetric(mainDescs["listen_queue_length"], prometheus.GaugeValue, float64(stats.ListenQueue))
+	ch <- prometheus.MustNewConstMetric(mainDescs["listen_queue_errors"], prometheus.GaugeValue, float64(stats.ListenQueueErrors))
+	ch <- prometheus.MustNewConstMetric(mainDescs["signal_queue_length"], prometheus.GaugeValue, float64(stats.SignalQueue))
+	ch <- prometheus.MustNewConstMetric(mainDescs["workers"], prometheus.GaugeValue, float64(len(stats.Workers)))
 
 	// Sockets
-	socketGauges := e.gaugesMap[socketSubsystem]
+	socketDescs := e.descriptorsMap[socketSubsystem]
 	for _, socketStats := range stats.Sockets {
 		labelValues := []string{socketStats.Name, socketStats.Proto}
 
-		socketGauges["queue_length"].WithLabelValues(labelValues...).Set(float64(socketStats.Queue))
-		socketGauges["max_queue_length"].WithLabelValues(labelValues...).Set(float64(socketStats.MaxQueue))
-		socketGauges["shared"].WithLabelValues(labelValues...).Set(float64(socketStats.Shared))
-		socketGauges["can_offload"].WithLabelValues(labelValues...).Set(float64(socketStats.CanOffload))
+		ch <- prometheus.MustNewConstMetric(socketDescs["queue_length"], prometheus.GaugeValue, float64(socketStats.Queue), labelValues...)
+		ch <- prometheus.MustNewConstMetric(socketDescs["max_queue_length"], prometheus.GaugeValue, float64(socketStats.MaxQueue), labelValues...)
+		ch <- prometheus.MustNewConstMetric(socketDescs["shared"], prometheus.GaugeValue, float64(socketStats.Shared), labelValues...)
+		ch <- prometheus.MustNewConstMetric(socketDescs["can_offload"], prometheus.GaugeValue, float64(socketStats.CanOffload), labelValues...)
 	}
 
 	// Workers
-	workerGauges := e.gaugesMap[workerSubsystem]
-	workerCounters := e.countersMap[workerSubsystem]
-	workerAppGauges := e.gaugesMap[workerAppSubsystem]
-	workerAppCounters := e.countersMap[workerAppSubsystem]
-	workerCoreCounters := e.gaugesMap[workerCoreSubsystem]
-
+	workerDescs := e.descriptorsMap[workerSubsystem]
+	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
+	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
 	for _, workerStats := range stats.Workers {
 		labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status}
 
-		workerGauges["accepting"].WithLabelValues(labelValues...).Set(float64(workerStats.Accepting))
-		workerGauges["delta_requests"].WithLabelValues(labelValues...).Set(float64(workerStats.DeltaRequests))
-		workerGauges["signal_queue_length"].WithLabelValues(labelValues...).Set(float64(workerStats.SignalQueue))
-		workerGauges["rss_bytes"].WithLabelValues(labelValues...).Set(float64(workerStats.RSS))
-		workerGauges["vsz_bytes"].WithLabelValues(labelValues...).Set(float64(workerStats.VSZ))
-		workerGauges["running_time_seconds"].WithLabelValues(labelValues...).Set(float64(workerStats.RunningTime) / usDivider)
-		workerGauges["last_spawn_time_seconds"].WithLabelValues(labelValues...).Set(float64(workerStats.LastSpawn))
-		workerGauges["average_response_time_seconds"].WithLabelValues(labelValues...).Set(float64(workerStats.AvgRt) / usDivider)
+		ch <- prometheus.MustNewConstMetric(workerDescs["accepting"], prometheus.GaugeValue, float64(workerStats.Accepting), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["delta_requests"], prometheus.GaugeValue, float64(workerStats.DeltaRequests), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["signal_queue_length"], prometheus.GaugeValue, float64(workerStats.SignalQueue), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["rss_bytes"], prometheus.GaugeValue, float64(workerStats.RSS), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["vsz_bytes"], prometheus.GaugeValue, float64(workerStats.VSZ), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["running_time_seconds"], prometheus.GaugeValue, float64(workerStats.RunningTime)/usDivider, labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["last_spawn_time_seconds"], prometheus.GaugeValue, float64(workerStats.LastSpawn), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["average_response_time_seconds"], prometheus.GaugeValue, float64(workerStats.AvgRt)/usDivider, labelValues...)
 
-		workerCounters["requests_total"].WithLabelValues(labelValues...).Set(float64(workerStats.Requests))
-		workerCounters["exceptions_total"].WithLabelValues(labelValues...).Set(float64(workerStats.Exceptions))
-		workerCounters["harakiri_count_total"].WithLabelValues(labelValues...).Set(float64(workerStats.HarakiriCount))
-		workerCounters["signals_total"].WithLabelValues(labelValues...).Set(float64(workerStats.Signals))
-		workerCounters["respawn_count_total"].WithLabelValues(labelValues...).Set(float64(workerStats.RespawnCount))
-		workerCounters["transmitted_bytes_total"].WithLabelValues(labelValues...).Set(float64(workerStats.TX))
+		ch <- prometheus.MustNewConstMetric(workerDescs["requests_total"], prometheus.CounterValue, float64(workerStats.Requests), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["exceptions_total"], prometheus.CounterValue, float64(workerStats.Exceptions), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["harakiri_count_total"], prometheus.CounterValue, float64(workerStats.HarakiriCount), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["signals_total"], prometheus.CounterValue, float64(workerStats.Signals), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["respawn_count_total"], prometheus.CounterValue, float64(workerStats.RespawnCount), labelValues...)
+		ch <- prometheus.MustNewConstMetric(workerDescs["transmitted_bytes_total"], prometheus.CounterValue, float64(workerStats.TX), labelValues...)
 
 		// Worker Apps
 		for _, appStats := range workerStats.Apps {
 			appLabelValues := append(labelValues, strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir)
-			workerAppGauges["startup_time_seconds"].WithLabelValues(appLabelValues...).Set(float64(appStats.StartupTime))
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["startup_time_seconds"], prometheus.GaugeValue, float64(appStats.StartupTime), appLabelValues...)
 
-			workerAppCounters["requests_total"].WithLabelValues(appLabelValues...).Set(float64(appStats.Requests))
-			workerAppCounters["exceptions_total"].WithLabelValues(appLabelValues...).Set(float64(appStats.Exceptions))
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["requests_total"], prometheus.CounterValue, float64(appStats.Requests), appLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["exceptions_total"], prometheus.CounterValue, float64(appStats.Exceptions), appLabelValues...)
 		}
 
 		// Worker Cores
 		for _, coreStats := range workerStats.Cores {
 			coreLabelValues := append(labelValues, strconv.Itoa(coreStats.ID))
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["in_requests"], prometheus.GaugeValue, float64(coreStats.InRequests), coreLabelValues...)
 
-			workerCoreCounters["requests_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.Requests))
-			workerCoreCounters["static_requests_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.StaticRequests))
-			workerCoreCounters["routed_reqeusts_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.RoutedRequests))
-			workerCoreCounters["offloaded_requests_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.OffloadedRequests))
-			workerCoreCounters["write_errors_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.WriteErrors))
-			workerCoreCounters["read_errors_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.ReadErrors))
-			workerCoreCounters["in_requests_total"].WithLabelValues(coreLabelValues...).Set(float64(coreStats.InRequests))
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["requests_total"], prometheus.CounterValue, float64(coreStats.Requests), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["static_requests_total"], prometheus.CounterValue, float64(coreStats.StaticRequests), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["routed_reqeusts_total"], prometheus.CounterValue, float64(coreStats.RoutedRequests), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["offloaded_requests_total"], prometheus.CounterValue, float64(coreStats.OffloadedRequests), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["write_errors_total"], prometheus.CounterValue, float64(coreStats.WriteErrors), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["read_errors_total"], prometheus.CounterValue, float64(coreStats.ReadErrors), coreLabelValues...)
 		}
 	}
 }
