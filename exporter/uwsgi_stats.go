@@ -1,6 +1,11 @@
 package exporter
 
-type UWSGIStats struct {
+import (
+	"encoding/json"
+	"io"
+)
+
+type UwsgiStats struct {
 	Version           string        `json:"version"`
 	ListenQueue       int           `json:"listen_queue"`
 	ListenQueueErrors int           `json:"listen_queue_errors"`
@@ -10,11 +15,11 @@ type UWSGIStats struct {
 	UID               int           `json:"uid"`
 	GID               int           `json:"gid"`
 	CWD               string        `json:"cwd"`
-	Sockets           []UWSGISocket `json:"sockets"`
-	Workers           []UWSGIWorker `json:"workers"`
+	Sockets           []UwsgiSocket `json:"sockets"`
+	Workers           []UwsgiWorker `json:"workers"`
 }
 
-type UWSGISocket struct {
+type UwsgiSocket struct {
 	Name       string `json:"name"`
 	Proto      string `json:"proto"`
 	Queue      int    `json:"queue"`
@@ -23,7 +28,7 @@ type UWSGISocket struct {
 	CanOffload int    `json:"can_offload"`
 }
 
-type UWSGIWorker struct {
+type UwsgiWorker struct {
 	ID            int         `json:"id"`
 	PID           int         `json:"pid"`
 	Accepting     int         `json:"accepting"`
@@ -41,11 +46,11 @@ type UWSGIWorker struct {
 	RespawnCount  int         `json:"respawn_count"`
 	TX            int         `json:"tx"`
 	AvgRt         int         `json:"avg_rt"`
-	Apps          []UWSGIApp  `json:"apps"`
-	Cores         []UWSGICore `json:"cores"`
+	Apps          []UwsgiApp  `json:"apps"`
+	Cores         []UwsgiCore `json:"cores"`
 }
 
-type UWSGIApp struct {
+type UwsgiApp struct {
 	ID          int    `json:"id"`
 	Modifier1   int    `json:"modifier1"`
 	Mountpoint  string `json:"mountpoint"`
@@ -55,7 +60,7 @@ type UWSGIApp struct {
 	Chdir       string `json:"chdir"`
 }
 
-type UWSGICore struct {
+type UwsgiCore struct {
 	ID                int      `json:"id"`
 	Requests          int      `json:"requests"`
 	StaticRequests    int      `json:"static_requests"`
@@ -65,4 +70,14 @@ type UWSGICore struct {
 	ReadErrors        int      `json:"read_errors"`
 	InRequests        int      `json:"in_requests"`
 	Vars              []string `json:"vars"`
+}
+
+func parseUwsgiStatsFromIO(r io.Reader) (*UwsgiStats, error) {
+	var uwsgiStats UwsgiStats
+	decoder := json.NewDecoder(r)
+	err := decoder.Decode(&uwsgiStats)
+	if err != nil {
+		return nil, err
+	}
+	return &uwsgiStats, nil
 }

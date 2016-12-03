@@ -1,1 +1,1 @@
-# UWSGI Exporter
+# uWSGI Exporter

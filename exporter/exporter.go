@@ -1,7 +1,6 @@
 package exporter
 
 import (
-	"encoding/json"
 	"strconv"
 	"sync"
 	"time"
@@ -10,8 +9,8 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-// UWSGIExporter collects uwsgi metrics for prometheus.
-type UWSGIExporter struct {
+// UwsgiExporter collects uwsgi metrics for prometheus.
+type UwsgiExporter struct {
 	mutex sync.RWMutex
 
 	uri          string
@@ -107,7 +106,7 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration, collectCores bool) *UWSGIExporter {
+func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExporter {
 	descriptorsMap := DescriptorsMap{}
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
@@ -126,7 +125,7 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UWSGIExp
 		log.Fatal(err)
 	}
 
-	return &UWSGIExporter{
+	return &UwsgiExporter{
 		uri:          uri,
 		timeout:      timeout,
 		collectCores: collectCores,
@@ -144,7 +143,7 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UWSGIExp
 
 // Describe describes all the metrics ever exported by the exporter.
 // It implements prometheus.Collector.
-func (e *UWSGIExporter) Describe(ch chan<- *prometheus.Desc) {
+func (e *UwsgiExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.scrapeDurations.Describe(ch)
 
 	for _, descs := range e.descriptorsMap {
@@ -156,7 +155,7 @@ func (e *UWSGIExporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches the stats from configured uwsgi stats location and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
-func (e *UWSGIExporter) Collect(ch chan<- prometheus.Metric) {
+func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 	begin := time.Now()
 	err := e.execute(ch)
 	duration := time.Since(begin)
@@ -174,26 +173,18 @@ func (e *UWSGIExporter) Collect(ch chan<- prometheus.Metric) {
 	e.scrapeDurations.Collect(ch)
 }
 
-func (e *UWSGIExporter) execute(ch chan<- prometheus.Metric) error {
+func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) error {
 	e.mutex.Lock() // To prevent metrics from concurrent collects.
 	defer e.mutex.Unlock()
 
-	// Read stats from uwsgi server
-	body, err := e.statsReader.Read()
+	// Read (and parse) stats from uwsgi server
+	uwsgiStats, err := e.statsReader.Read()
 	if err != nil {
-		return err
-	}
-
-	// Parse stats JSON data into struct
-	var uwsgiStats UWSGIStats
-	err = json.Unmarshal(body, &uwsgiStats)
-	if err != nil {
-		log.Errorf("Failed to unmarshal JSON into struct: %s", err)
 		return err
 	}
 
 	// Collect metrics from stats
-	e.collectMetrics(ch, &uwsgiStats)
+	e.collectMetrics(ch, uwsgiStats)
 
 	return nil
 }
@@ -206,7 +197,7 @@ func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...stri
 	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelsValues...)
 }
 
-func (e *UWSGIExporter) collectMetrics(ch chan<- prometheus.Metric, stats *UWSGIStats) {
+func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *UwsgiStats) {
 	// Main
 	mainDescs := e.descriptorsMap[mainSubsystem]
 

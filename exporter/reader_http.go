@@ -1,8 +1,10 @@
 package exporter
 
 import (
-	"io/ioutil"
+	"net"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/prometheus/common/log"
 )
@@ -14,7 +16,35 @@ type HTTPStatsReader struct {
 	client *http.Client
 }
 
-func (reader *HTTPStatsReader) Read() ([]byte, error) {
+func init() {
+	StatsReaderCreators = append(StatsReaderCreators, newHTTPStatsReader)
+}
+
+func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil
+	}
+
+	return &HTTPStatsReader{
+		uri: uri,
+		client: &http.Client{
+			Transport: &http.Transport{
+				Dial: func(network, addr string) (net.Conn, error) {
+					c, err := net.DialTimeout(network, addr, timeout)
+					if err != nil {
+						return nil, err
+					}
+					if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
+						return nil, err
+					}
+					return c, nil
+				},
+			},
+		},
+	}
+}
+
+func (reader *HTTPStatsReader) Read() (*UwsgiStats, error) {
 	resp, err := reader.client.Get(reader.uri)
 	if err != nil {
 		log.Errorf("Error while querying uwsgi stats: %s", err)
@@ -22,11 +52,10 @@ func (reader *HTTPStatsReader) Read() ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	uwsgiStats, err := parseUwsgiStatsFromIO(resp.Body)
 	if err != nil {
-		log.Errorf("Failed to read stats body: %s", err)
+		log.Errorf("Failed to unmarshal JSON: %s", err)
 		return nil, err
 	}
-
-	return body, nil
+	return uwsgiStats, nil
 }
