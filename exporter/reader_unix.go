@@ -14,7 +14,7 @@ type UnixStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newHTTPStatsReader)
+	StatsReaderCreators = append(StatsReaderCreators, newUnixStatsReader)
 }
 
 func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
