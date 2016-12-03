@@ -44,9 +44,9 @@ func main() {
 	http.Handle(*metricsPath, handler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
-			<head><title>UWSGI Exporter</title></head>
+			<head><title>uWSGI Exporter</title></head>
 			<body>
-			<h1>UWSGI Exporter</h1>
+			<h1>uWSGI Exporter</h1>
 			<p><a href="` + *metricsPath + `">Metrics</a></p>
 			</body>
 			</html>`))
