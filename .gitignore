@@ -27,7 +27,9 @@ dependencies-stamp
 /.release
 /.tarballs
 
-# Intellij
+# VSCode
+/.vscode
 
+# Intellij
 /.idea
 *.iml

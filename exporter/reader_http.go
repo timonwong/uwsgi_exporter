@@ -9,8 +9,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-// HTTPStatsReader reads uwsgi stats through HTTP(s).
-type HTTPStatsReader struct {
+type httpStatsReader struct {
 	uri string
 
 	client *http.Client
@@ -25,7 +24,7 @@ func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 		return nil
 	}
 
-	return &HTTPStatsReader{
+	return &httpStatsReader{
 		uri: uri,
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -44,10 +43,10 @@ func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 	}
 }
 
-func (reader *HTTPStatsReader) Read() (*UwsgiStats, error) {
+func (reader *httpStatsReader) Read() (*UwsgiStats, error) {
 	resp, err := reader.client.Get(reader.uri)
 	if err != nil {
-		log.Errorf("Error while querying uwsgi stats: %s", err)
+		log.Errorf("Error while querying uwsgi stats %s: %s", reader.uri, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
