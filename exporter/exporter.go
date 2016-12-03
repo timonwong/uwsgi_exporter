@@ -14,15 +14,19 @@ import (
 type UWSGIExporter struct {
 	mutex sync.RWMutex
 
-	uri         string
-	timeout     time.Duration
-	statsReader StatsReader
+	uri          string
+	timeout      time.Duration
+	collectCores bool
+	statsReader  StatsReader
 
 	scrapeDurations *prometheus.SummaryVec
 	descriptorsMap  DescriptorsMap
 }
 
+// Descriptors is a map for `prometheus.Desc` pointer.
 type Descriptors map[string]*prometheus.Desc
+
+// DescriptorsMap is a map for `Descriptors`.
 type DescriptorsMap map[string]Descriptors
 
 const (
@@ -62,6 +66,8 @@ var (
 			"running_time_seconds":          "Worker running time in seconds.",
 			"last_spawn_time_seconds":       "Last spawn time in seconds since epoch.",
 			"average_response_time_seconds": "Average response time in seconds.",
+			"apps":  "Number of apps.",
+			"cores": "Number of cores.",
 
 			"requests_total":          "Total number of requests.",
 			"exceptions_total":        "Total number of exceptions.",
@@ -101,7 +107,7 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration) *UWSGIExporter {
+func NewExporter(uri string, timeout time.Duration, collectCores bool) *UWSGIExporter {
 	descriptorsMap := DescriptorsMap{}
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
@@ -121,9 +127,10 @@ func NewExporter(uri string, timeout time.Duration) *UWSGIExporter {
 	}
 
 	return &UWSGIExporter{
-		uri:         uri,
-		timeout:     timeout,
-		statsReader: statsReader,
+		uri:          uri,
+		timeout:      timeout,
+		collectCores: collectCores,
+		statsReader:  statsReader,
 
 		scrapeDurations: prometheus.NewSummaryVec(prometheus.SummaryOpts{
 			Namespace: namespace,
@@ -156,10 +163,10 @@ func (e *UWSGIExporter) Collect(ch chan<- prometheus.Metric) {
 	var result string
 
 	if err != nil {
-		log.Errorf("ERROR: collector failed after %fs: %s", duration.Seconds(), err)
+		log.Errorf("ERROR: scrape failed after %fs: %s", duration.Seconds(), err)
 		result = "error"
 	} else {
-		log.Debugf("OK: collector successful after %fs.", duration.Seconds())
+		log.Debugf("OK: scrape successful after %fs.", duration.Seconds())
 		result = "success"
 	}
 
@@ -243,6 +250,7 @@ func (e *UWSGIExporter) collectMetrics(ch chan<- prometheus.Metric, stats *UWSGI
 		ch <- newCounterMetric(workerDescs["transmitted_bytes_total"], float64(workerStats.TX), labelValues...)
 
 		// Worker Apps
+		ch <- newGaugeMetric(workerDescs["apps"], float64(len(workerStats.Apps)), labelValues...)
 		for _, appStats := range workerStats.Apps {
 			labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir}
 			ch <- newGaugeMetric(workerAppDescs["startup_time_seconds"], float64(appStats.StartupTime), labelValues...)
@@ -252,16 +260,19 @@ func (e *UWSGIExporter) collectMetrics(ch chan<- prometheus.Metric, stats *UWSGI
 		}
 
 		// Worker Cores
-		for _, coreStats := range workerStats.Cores {
-			labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(coreStats.ID)}
-			ch <- newGaugeMetric(workerCoreDescs["in_requests"], float64(coreStats.InRequests), labelValues...)
+		ch <- newGaugeMetric(workerDescs["cores"], float64(len(workerStats.Cores)), labelValues...)
+		if e.collectCores {
+			for _, coreStats := range workerStats.Cores {
+				labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(coreStats.ID)}
+				ch <- newGaugeMetric(workerCoreDescs["in_requests"], float64(coreStats.InRequests), labelValues...)
 
-			ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
-			ch <- newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
-			ch <- newCounterMetric(workerCoreDescs["routed_reqeusts_total"], float64(coreStats.RoutedRequests), labelValues...)
-			ch <- newCounterMetric(workerCoreDescs["offloaded_requests_total"], float64(coreStats.OffloadedRequests), labelValues...)
-			ch <- newCounterMetric(workerCoreDescs["write_errors_total"], float64(coreStats.WriteErrors), labelValues...)
-			ch <- newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["routed_reqeusts_total"], float64(coreStats.RoutedRequests), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["offloaded_requests_total"], float64(coreStats.OffloadedRequests), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["write_errors_total"], float64(coreStats.WriteErrors), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
+			}
 		}
 	}
 }

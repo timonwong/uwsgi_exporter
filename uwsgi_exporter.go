@@ -25,6 +25,7 @@ func main() {
 		metricsPath   = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 		statsURI      = flag.String("stats.uri", "", "URI for accessing uwsgi stats.")
 		statsTimeout  = flag.Duration("stats.timeout", 5*time.Second, "Timeout for trying to get stats from uwsgi.")
+		collectCores  = flag.Bool("collect.cores", true, "Collect cores information per uwsgi worker.")
 	)
 	flag.Parse()
 
@@ -36,7 +37,7 @@ func main() {
 	log.Infoln("Starting uwsgi_exporter", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 
-	uwsgiExporter := exporter.NewExporter(*statsURI, *statsTimeout)
+	uwsgiExporter := exporter.NewExporter(*statsURI, *statsTimeout, *collectCores)
 	prometheus.MustRegister(uwsgiExporter)
 
 	handler := prometheus.Handler()
