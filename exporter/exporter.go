@@ -159,11 +159,12 @@ func (e *UWSGIExporter) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("ERROR: collector failed after %fs: %s", duration.Seconds(), err)
 		result = "error"
 	} else {
-		log.Debugf("OK: collector failed after %fs.", duration.Seconds())
+		log.Debugf("OK: collector successful after %fs.", duration.Seconds())
 		result = "success"
 	}
 
 	e.scrapeDurations.WithLabelValues(result).Observe(duration.Seconds())
+	e.scrapeDurations.Collect(ch)
 }
 
 func (e *UWSGIExporter) execute(ch chan<- prometheus.Metric) error {
