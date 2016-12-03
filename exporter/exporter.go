@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -45,13 +44,6 @@ var (
 			"listen_queue_errors": "Number of listen queue errors.",
 			"signal_queue_length": "Length of signal queue.",
 			"workers":             "Number of workers.",
-
-			"requests_total":          "Total number of requests.",
-			"exceptions_total":        "Total number of exceptions.",
-			"harakiri_count_total":    "Total number of harakiri count.",
-			"signals_total":           "Total number of signals.",
-			"respawn_count_total":     "Total number of respawn count.",
-			"transmitted_bytes_total": "Worker transmitted bytes.",
 		},
 
 		socketSubsystem: map[string]string{
@@ -70,6 +62,13 @@ var (
 			"running_time_seconds":          "Worker running time in seconds.",
 			"last_spawn_time_seconds":       "Last spawn time in seconds since epoch.",
 			"average_response_time_seconds": "Average response time in seconds.",
+
+			"requests_total":          "Total number of requests.",
+			"exceptions_total":        "Total number of exceptions.",
+			"harakiri_count_total":    "Total number of harakiri count.",
+			"signals_total":           "Total number of signals.",
+			"respawn_count_total":     "Total number of respawn count.",
+			"transmitted_bytes_total": "Worker transmitted bytes.",
 		},
 
 		workerAppSubsystem: map[string]string{
@@ -109,8 +108,11 @@ func NewExporter(uri string, timeout time.Duration) *UWSGIExporter {
 	for subsystem, metrics := range metricsMap {
 		descriptors := Descriptors{}
 		for name, help := range metrics {
-			descriptors[name] = prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, subsystem, name), help, labelsMap[subsystem], constLabels)
+			descriptors[name] = prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, subsystem, name), help, labelsMap[subsystem], constLabels)
 		}
+
+		descriptorsMap[subsystem] = descriptors
 	}
 
 	statsReader, err := NewStatsReader(uri, timeout)
@@ -176,7 +178,7 @@ func (e *UWSGIExporter) execute(ch chan<- prometheus.Metric) error {
 
 	// Parse stats JSON data into struct
 	var uwsgiStats UWSGIStats
-	err = json.Unmarshal(body, uwsgiStats)
+	err = json.Unmarshal(body, &uwsgiStats)
 	if err != nil {
 		log.Errorf("Failed to unmarshal JSON into struct: %s", err)
 		return err
@@ -232,24 +234,24 @@ func (e *UWSGIExporter) collectStats(ch chan<- prometheus.Metric, stats *UWSGISt
 
 		// Worker Apps
 		for _, appStats := range workerStats.Apps {
-			appLabelValues := append(labelValues, strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir)
-			ch <- prometheus.MustNewConstMetric(workerAppDescs["startup_time_seconds"], prometheus.GaugeValue, float64(appStats.StartupTime), appLabelValues...)
+			labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir}
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["startup_time_seconds"], prometheus.GaugeValue, float64(appStats.StartupTime), labelValues...)
 
-			ch <- prometheus.MustNewConstMetric(workerAppDescs["requests_total"], prometheus.CounterValue, float64(appStats.Requests), appLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerAppDescs["exceptions_total"], prometheus.CounterValue, float64(appStats.Exceptions), appLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["requests_total"], prometheus.CounterValue, float64(appStats.Requests), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerAppDescs["exceptions_total"], prometheus.CounterValue, float64(appStats.Exceptions), labelValues...)
 		}
 
 		// Worker Cores
 		for _, coreStats := range workerStats.Cores {
-			coreLabelValues := append(labelValues, strconv.Itoa(coreStats.ID))
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["in_requests"], prometheus.GaugeValue, float64(coreStats.InRequests), coreLabelValues...)
+			labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(coreStats.ID)}
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["in_requests"], prometheus.GaugeValue, float64(coreStats.InRequests), labelValues...)
 
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["requests_total"], prometheus.CounterValue, float64(coreStats.Requests), coreLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["static_requests_total"], prometheus.CounterValue, float64(coreStats.StaticRequests), coreLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["routed_reqeusts_total"], prometheus.CounterValue, float64(coreStats.RoutedRequests), coreLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["offloaded_requests_total"], prometheus.CounterValue, float64(coreStats.OffloadedRequests), coreLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["write_errors_total"], prometheus.CounterValue, float64(coreStats.WriteErrors), coreLabelValues...)
-			ch <- prometheus.MustNewConstMetric(workerCoreDescs["read_errors_total"], prometheus.CounterValue, float64(coreStats.ReadErrors), coreLabelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["requests_total"], prometheus.CounterValue, float64(coreStats.Requests), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["static_requests_total"], prometheus.CounterValue, float64(coreStats.StaticRequests), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["routed_reqeusts_total"], prometheus.CounterValue, float64(coreStats.RoutedRequests), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["offloaded_requests_total"], prometheus.CounterValue, float64(coreStats.OffloadedRequests), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["write_errors_total"], prometheus.CounterValue, float64(coreStats.WriteErrors), labelValues...)
+			ch <- prometheus.MustNewConstMetric(workerCoreDescs["read_errors_total"], prometheus.CounterValue, float64(coreStats.ReadErrors), labelValues...)
 		}
 	}
 }

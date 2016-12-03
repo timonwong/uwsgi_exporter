@@ -25,6 +25,7 @@ func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 
 	switch u.Scheme {
 	case "http":
+		fallthrough
 	case "https":
 		reader := &HTTPStatsReader{
 			uri: uri,
