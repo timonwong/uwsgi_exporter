@@ -21,7 +21,7 @@ func init() {
 func main() {
 	var (
 		showVersion   = flag.Bool("version", false, "Print version information.")
-		listenAddress = flag.String("web.listen-address", ":9107", "Address on which to expose metrics and web interfaces.")
+		listenAddress = flag.String("web.listen-address", ":9117", "Address on which to expose metrics and web interfaces.")
 		metricsPath   = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 		statsURI      = flag.String("stats.uri", "", "URI for accessing uwsgi stats.")
 		statsTimeout  = flag.Duration("stats.timeout", 5*time.Second, "Timeout for trying to get stats from uwsgi.")

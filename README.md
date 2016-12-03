@@ -29,7 +29,7 @@ stats.uri                                  | URI for accessing uwsgi stats.
 stats.timeout                              | Timeout for trying to get stats from uwsgi. (default 5s)
 collect.cores                              | Whether to collect cores information per uwsgi worker. (default: true)
 log.level                                  | Logging verbosity. (default: info)
-web.listen-address                         | Address to listen on for web interface and telemetry. (default: ":9107")
+web.listen-address                         | Address to listen on for web interface and telemetry. (default: ":9117")
 web.telemetry-path                         | Path under which to expose metrics.
 version                                    | Print the version information.
 
@@ -42,7 +42,7 @@ For example:
 ```bash
 docker pull timonwong/uwsgi-exporter
 
-docker run -d -p 9107:9107 timonwong/uwsgi-exporter
+docker run -d -p 9117:9117 timonwong/uwsgi-exporter
 ```
 
 [uWSGI]: https://uwsgi-docs.readthedocs.io
