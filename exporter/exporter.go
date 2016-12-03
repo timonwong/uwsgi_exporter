@@ -99,9 +99,9 @@ var (
 	labelsMap = map[string][]string{
 		mainSubsystem:       {},
 		socketSubsystem:     {"name", "proto"},
-		workerSubsystem:     {"worker_id", "status"},
-		workerAppSubsystem:  {"worker_id", "status", "app_id", "mountpoint", "chdir"},
-		workerCoreSubsystem: {"worker_id", "status", "core_id"},
+		workerSubsystem:     {"worker_id"},
+		workerAppSubsystem:  {"worker_id", "app_id", "mountpoint", "chdir"},
+		workerCoreSubsystem: {"worker_id", "core_id"},
 	}
 )
 
@@ -222,7 +222,7 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
 	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
 	for _, workerStats := range stats.Workers {
-		labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status}
+		labelValues := []string{strconv.Itoa(workerStats.ID)}
 
 		ch <- newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
 		ch <- newGaugeMetric(workerDescs["delta_requests"], float64(workerStats.DeltaRequests), labelValues...)
@@ -243,7 +243,7 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 		// Worker Apps
 		ch <- newGaugeMetric(workerDescs["apps"], float64(len(workerStats.Apps)), labelValues...)
 		for _, appStats := range workerStats.Apps {
-			labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir}
+			labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir}
 			ch <- newGaugeMetric(workerAppDescs["startup_time_seconds"], float64(appStats.StartupTime), labelValues...)
 
 			ch <- newCounterMetric(workerAppDescs["requests_total"], float64(appStats.Requests), labelValues...)
@@ -254,7 +254,7 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 		ch <- newGaugeMetric(workerDescs["cores"], float64(len(workerStats.Cores)), labelValues...)
 		if e.collectCores {
 			for _, coreStats := range workerStats.Cores {
-				labelValues := []string{strconv.Itoa(workerStats.ID), workerStats.Status, strconv.Itoa(coreStats.ID)}
+				labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(coreStats.ID)}
 				ch <- newGaugeMetric(workerCoreDescs["in_requests"], float64(coreStats.InRequests), labelValues...)
 
 				ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
