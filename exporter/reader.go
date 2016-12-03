@@ -2,8 +2,6 @@ package exporter
 
 import (
 	"fmt"
-	"net"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -12,8 +10,16 @@ import (
 
 // StatsReader reads uwsgi stats from specified uri.
 type StatsReader interface {
-	Read() ([]byte, error)
+	Read() (*UwsgiStats, error)
 }
+
+// StatsReaderCreator is prototype for new stats reader
+type StatsReaderCreator func(u *url.URL, uri string, timeout time.Duration) StatsReader
+
+var (
+	// StatsReaderCreators is a response chain for stats reader creators.
+	StatsReaderCreators []StatsReaderCreator
+)
 
 // NewStatsReader creates a StatsReader according to uri.
 func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
@@ -23,30 +29,12 @@ func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 		return nil, err
 	}
 
-	switch u.Scheme {
-	case "http":
-		fallthrough
-	case "https":
-		reader := &HTTPStatsReader{
-			uri: uri,
-			client: &http.Client{
-				Transport: &http.Transport{
-					Dial: func(network, addr string) (net.Conn, error) {
-						c, err := net.DialTimeout(network, addr, timeout)
-						if err != nil {
-							return nil, err
-						}
-						if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
-							return nil, err
-						}
-						return c, nil
-					},
-				},
-			},
+	for _, statsReaderCreator := range StatsReaderCreators {
+		reader := statsReaderCreator(u, uri, timeout)
+		if reader != nil {
+			return reader, nil
 		}
-		return reader, nil
 	}
 
-	err = fmt.Errorf("Unknown scheme %s", u.Scheme)
-	return nil, err
+	return nil, fmt.Errorf("Incompatible uri %s", uri)
 }
