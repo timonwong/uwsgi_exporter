@@ -8,6 +8,9 @@ build:
     -X {{repoPath}}/vendor/github.com/prometheus/common/version.Branch={{.Branch}}
     -X {{repoPath}}/vendor/github.com/prometheus/common/version.BuildUser={{user}}@{{host}}
     -X {{repoPath}}/vendor/github.com/prometheus/common/version.BuildDate={{date "20060102-15:04:05"}}
+tarball:
+  files:
+    - LICENSE
 crossbuild:
   platforms:
     - linux/amd64
