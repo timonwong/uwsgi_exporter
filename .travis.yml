@@ -1,0 +1,15 @@
+sudo: false
+
+language: go
+go:
+  - 1.6.2
+
+script:
+  - make test
+
+branches:
+  only:
+    - master
+
+notifications:
+  email: false
