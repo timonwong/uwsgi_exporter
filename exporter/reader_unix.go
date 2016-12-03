@@ -8,9 +8,9 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-// UnixStatsReader reads uwsgi stats from specified unix socket.
-type UnixStatsReader struct {
+type unixStatsReader struct {
 	filename string
+	timeout time.Duration
 }
 
 func init() {
@@ -22,18 +22,24 @@ func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 		return nil
 	}
 
-	return &UnixStatsReader{
+	return &unixStatsReader{
 		filename: u.Path,
 	}
 }
 
-func (reader *UnixStatsReader) Read() (*UwsgiStats, error) {
+func (reader *unixStatsReader) Read() (*UwsgiStats, error) {
 	conn, err := net.Dial("unix", string(reader.filename))
 	if err != nil {
-		log.Errorf("Error while reading uwsgi stats from unix socket: %s", reader.filename)
+		log.Errorf("Error while reading uwsgi stats from unix socket %s: %s", reader.filename, err)
 		return nil, err
 	}
 	defer conn.Close()
+
+	err = conn.SetDeadline(time.Now().Add(reader.timeout))
+	if err != nil {
+		log.Errorf("Failed to set deadline: %s", err)
+		return nil, err
+	}
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(conn)
 	if err != nil {
