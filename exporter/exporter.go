@@ -42,21 +42,21 @@ const (
 
 var (
 	metricsMap = map[string]map[string]string{
-		mainSubsystem: map[string]string{
+		mainSubsystem: {
 			"listen_queue_length": "Length of listen queue.",
 			"listen_queue_errors": "Number of listen queue errors.",
 			"signal_queue_length": "Length of signal queue.",
 			"workers":             "Number of workers.",
 		},
 
-		socketSubsystem: map[string]string{
+		socketSubsystem: {
 			"queue_length":     "Length of socket queue.",
 			"max_queue_length": "Max length of socket queue.",
 			"shared":           "Is shared socket?",
 			"can_offload":      "Can socket offload?",
 		},
 
-		workerSubsystem: map[string]string{
+		workerSubsystem: {
 			"accepting":                     "Is this worker accepting requests?",
 			"delta_requests":                "Number of delta requests",
 			"signal_queue_length":           "Length of signal queue.",
@@ -76,14 +76,14 @@ var (
 			"transmitted_bytes_total": "Worker transmitted bytes.",
 		},
 
-		workerAppSubsystem: map[string]string{
+		workerAppSubsystem: {
 			"startup_time_seconds": "How long this app took to start.",
 
 			"requests_total":   "Total number of requests.",
 			"exceptions_total": "Total number of exceptions.",
 		},
 
-		workerCoreSubsystem: map[string]string{
+		workerCoreSubsystem: {
 			"in_requests": "In requests?",
 
 			"requests_total":           "Total number of requests.",
@@ -97,11 +97,11 @@ var (
 
 	// Please note that stats_uri is omitted here, because it's const
 	labelsMap = map[string][]string{
-		mainSubsystem:       []string{},
-		socketSubsystem:     []string{"name", "proto"},
-		workerSubsystem:     []string{"worker_id", "status"},
-		workerAppSubsystem:  []string{"worker_id", "status", "app_id", "mountpoint", "chdir"},
-		workerCoreSubsystem: []string{"worker_id", "status", "core_id"},
+		mainSubsystem:       {},
+		socketSubsystem:     {"name", "proto"},
+		workerSubsystem:     {"worker_id", "status"},
+		workerAppSubsystem:  {"worker_id", "status", "app_id", "mountpoint", "chdir"},
+		workerCoreSubsystem: {"worker_id", "status", "core_id"},
 	}
 )
 
