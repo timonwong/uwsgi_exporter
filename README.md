@@ -6,3 +6,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/timonwong/uwsgi_exporter)](https://goreportcard.com/report/github.com/timonwong/uwsgi_exporter)
 
 Prometheus exporter for uWSGI metrics.
+
+[circleci]: https://circleci.com/gh/timonwong/uwsgi_exporter
+[hub]: https://hub.docker.com/r/timonwong/uwsgi-exporter/
+[travis]: https://travis-ci.org/timonwong/uwsgi_exporter
+[quay]: https://quay.io/repository/timonwong/uwsgi-exporter
