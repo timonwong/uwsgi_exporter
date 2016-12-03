@@ -7,14 +7,15 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+// HTTPStatsReader reads uwsgi stats through HTTP(s).
 type HTTPStatsReader struct {
-	url    string
+	uri string
 
 	client *http.Client
 }
 
 func (reader *HTTPStatsReader) Read() ([]byte, error) {
-	resp, err := reader.client.Get(reader.url)
+	resp, err := reader.client.Get(reader.uri)
 	if err != nil {
 		log.Errorf("Error while querying uwsgi stats: %s", err)
 		return nil, err
