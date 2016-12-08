@@ -5,7 +5,7 @@ go:
   - 1.6.2
 
 script:
-  - make test
+  - make test vet
 
 branches:
   only:
