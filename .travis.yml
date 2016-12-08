@@ -5,7 +5,10 @@ go:
   - 1.6.2
 
 script:
-  - make test vet
+  - make cover vet
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
 
 branches:
   only:
