@@ -13,31 +13,30 @@
 
 GO    := GO15VENDOREXPERIMENT=1 go
 PROMU := $(GOPATH)/bin/promu
-pkgs   = $(shell $(GO) list ./... | grep -v /vendor/)
 
 PREFIX                  ?= $(shell pwd)
 BIN_DIR                 ?= $(shell pwd)
 DOCKER_IMAGE_NAME       ?= uwsgi-exporter
 DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
+VETARGS?=-all
+TEST?=$$(go list ./... | grep -v '/vendor/')
+GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
 
 all: format build test
 
-style:
-	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
-
-test:
+test: fmtcheck
 	@echo ">> running tests"
-	@$(GO) test -short $(pkgs)
-
-format:
-	@echo ">> formatting code"
-	@$(GO) fmt $(pkgs)
+	@$(GO) test $(TEST) $(TESTARGS)
 
 vet:
 	@echo ">> vetting code"
-	@$(GO) vet $(pkgs)
+	@go tool vet $(VETARGS) $$(ls -d */ | grep -v vendor) ; if [ $$? -eq 1 ]; then \
+		echo ""; \
+		echo "Vet found suspicious constructs. Please check the reported constructs"; \
+		echo "and fix them if necessary before submitting the code for review."; \
+		exit 1; \
+	fi
 
 build: promu
 	@echo ">> building binaries"
@@ -56,5 +55,12 @@ promu:
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
 		$(GO) get -u github.com/prometheus/promu
 
+format:
+	@echo ">> formatting code"
+	@gofmt -w $(GOFMT_FILES)
 
-.PHONY: all style format build test vet tarball docker promu
+fmtcheck:
+	@echo ">> checking code style"
+	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
+
+.PHONY: all format build test vet tarball docker promu fmtcheck

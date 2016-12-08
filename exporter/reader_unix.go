@@ -10,7 +10,7 @@ import (
 
 type unixStatsReader struct {
 	filename string
-	timeout time.Duration
+	timeout  time.Duration
 }
 
 func init() {
@@ -24,6 +24,7 @@ func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 
 	return &unixStatsReader{
 		filename: u.Path,
+		timeout:  timeout,
 	}
 }
 
