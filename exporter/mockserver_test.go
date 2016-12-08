@@ -82,3 +82,35 @@ func newLocalServer(network string) (*localServer, error) {
 	}
 	return &localServer{Listener: ln, done: make(chan bool)}, nil
 }
+
+func justwriteHandler(content []byte, ch chan<- error) func(*localServer, net.Listener) {
+	return func(ls *localServer, ln net.Listener) {
+		defer close(ch)
+
+		switch ln := ln.(type) {
+		case *net.UnixListener:
+			ln.SetDeadline(time.Now().Add(someTimeout))
+		case *net.TCPListener:
+			ln.SetDeadline(time.Now().Add(someTimeout))
+		}
+		c, err := ln.Accept()
+		if err != nil {
+			ch <- err
+			return
+		}
+		defer c.Close()
+
+		network := ln.Addr().Network()
+		if c.LocalAddr().Network() != network || c.RemoteAddr().Network() != network {
+			ch <- fmt.Errorf("got %v->%v; expected %v->%v", c.LocalAddr().Network(), c.RemoteAddr().Network(), network, network)
+			return
+		}
+
+		c.SetDeadline(time.Now().Add(someTimeout))
+
+		if _, err := c.Write(content); err != nil {
+			ch <- err
+			return
+		}
+	}
+}

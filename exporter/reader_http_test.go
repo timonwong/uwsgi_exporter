@@ -6,11 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFileStatsReader_Read(t *testing.T) {
+func TestHTTPStatsReader_Read(t *testing.T) {
 	a := assert.New(t)
 
-	uri := "file://" + sampleUwsgiStatsFileName
+	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
+	defer s.Close()
 
+	uri := s.URL
 	reader, err := NewStatsReader(uri, someTimeout)
 	a.NoError(err)
 
