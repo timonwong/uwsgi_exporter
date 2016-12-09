@@ -16,6 +16,9 @@ func TestHTTPStatsReader_Read(t *testing.T) {
 	reader, err := NewStatsReader(uri, someTimeout)
 	a.NoError(err)
 
+	_, ok := reader.(*httpStatsReader)
+	a.True(ok)
+
 	uwsgiStats, err := reader.Read()
 	a.NoError(err)
 

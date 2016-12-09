@@ -14,6 +14,9 @@ func TestFileStatsReader_Read(t *testing.T) {
 	reader, err := NewStatsReader(uri, someTimeout)
 	a.NoError(err)
 
+	_, ok := reader.(*fileStatsReader)
+	a.True(ok)
+
 	uwsgiStats, err := reader.Read()
 	a.NoError(err)
 
