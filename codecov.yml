@@ -16,13 +16,7 @@ coverage:
 
   status:
     changes: false
-    patch: true
-    project: true
-
-parsers:
-  gcov:
-    branch_detection:
-      conditional: true
-      loop: true
-      macro: false
-      method: false
+    patch: false
+    project:
+      default:
+        target: 65

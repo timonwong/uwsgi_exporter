@@ -25,7 +25,7 @@ make
 
 Name                                       | Description
 -------------------------------------------|--------------------------------------------------------------------------------------------------
-stats.uri                                  | URI for accessing uwsgi stats.
+stats.uri                                  | URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").
 stats.timeout                              | Timeout for trying to get stats from uwsgi. (default 5s)
 collect.cores                              | Whether to collect cores information per uwsgi worker. (default: true)
 log.level                                  | Logging verbosity. (default: info)
@@ -35,7 +35,10 @@ version                                    | Print the version information.
 
 ## Using Docker
 
-You can deploy this exporter using the [timonwong/uwsgi-exporter](https://registry.hub.docker.com/u/timonwong/uwsgi-exporter/) Docker image.
+You can deploy this exporter using the Docker image from following registry:
+
+* [DockerHub]\: [timonwong/uwsgi-exporter](https://registry.hub.docker.com/u/timonwong/uwsgi-exporter/)
+* [Quay.io]\: [timonwong/uwsgi-exporter](https://quay.io/repository/timonwong/uwsgi-exporter)
 
 For example:
 
@@ -50,3 +53,5 @@ docker run -d -p 9117:9117 timonwong/uwsgi-exporter
 [hub]: https://hub.docker.com/r/timonwong/uwsgi-exporter/
 [travis]: https://travis-ci.org/timonwong/uwsgi_exporter
 [quay]: https://quay.io/repository/timonwong/uwsgi-exporter
+[DockerHub]: https://hub.docker.com
+[Quay.io]: https://quay.io
