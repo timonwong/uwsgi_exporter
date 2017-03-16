@@ -222,6 +222,10 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
 	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
 	for _, workerStats := range stats.Workers {
+		if workerStats.ID == 0 {
+			continue
+		}
+
 		labelValues := []string{strconv.Itoa(workerStats.ID)}
 
 		ch <- newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
