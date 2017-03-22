@@ -201,10 +201,20 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 	// Main
 	mainDescs := e.descriptorsMap[mainSubsystem]
 
+	availableWorkers := make([]UwsgiWorker, 0, len(stats.Workers))
+	// Filter workers (filter out "stand-by" workers, in uwsgi's adaptive process respawn mode)
+	for _, workerStats := range stats.Workers {
+		if workerStats.ID == 0 {
+			continue
+		}
+
+		availableWorkers = append(availableWorkers, workerStats)
+	}
+
 	ch <- newGaugeMetric(mainDescs["listen_queue_length"], float64(stats.ListenQueue))
 	ch <- newGaugeMetric(mainDescs["listen_queue_errors"], float64(stats.ListenQueueErrors))
 	ch <- newGaugeMetric(mainDescs["signal_queue_length"], float64(stats.SignalQueue))
-	ch <- newGaugeMetric(mainDescs["workers"], float64(len(stats.Workers)))
+	ch <- newGaugeMetric(mainDescs["workers"], float64(len(availableWorkers)))
 
 	// Sockets
 	socketDescs := e.descriptorsMap[socketSubsystem]
@@ -221,11 +231,8 @@ func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *Uwsgi
 	workerDescs := e.descriptorsMap[workerSubsystem]
 	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
 	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
-	for _, workerStats := range stats.Workers {
-		if workerStats.ID == 0 {
-			continue
-		}
 
+	for _, workerStats := range availableWorkers {
 		labelValues := []string{strconv.Itoa(workerStats.ID)}
 
 		ch <- newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
