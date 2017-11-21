@@ -4,7 +4,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
+	"path"
+	"runtime"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,6 +14,7 @@ import (
 )
 
 var (
+	testdataDir              string
 	sampleUwsgiStatsFileName string
 	sampleUwsgiStatsJSON     []byte
 )
@@ -20,11 +22,11 @@ var (
 func init() {
 	var err error
 
-	if sampleUwsgiStatsFileName, err = filepath.Abs("../testdata/sample.json"); err != nil {
-		panic(err)
-	}
+	_, filename, _, _ := runtime.Caller(0)
+	testdataDir = path.Join(path.Dir(filename), "../testdata")
 
-	if sampleUwsgiStatsJSON, err = ioutil.ReadFile("../testdata/sample.json"); err != nil {
+	sampleUwsgiStatsFileName = path.Join(testdataDir, "sample.json")
+	if sampleUwsgiStatsJSON, err = ioutil.ReadFile(sampleUwsgiStatsFileName); err != nil {
 		panic(err)
 	}
 }
@@ -161,8 +163,13 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		readMetric(<-ch)
 	}
 
-	// scrape duration
-	expected := MetricResult{labels: labelMap{"result": "success"}, value: 0, metricType: dto.MetricType_SUMMARY}
+	// uwsgi_up
+	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
 	got := readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// scrape duration
+	expected = MetricResult{labels: labelMap{"result": "success"}, value: 0, metricType: dto.MetricType_SUMMARY}
+	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 }
