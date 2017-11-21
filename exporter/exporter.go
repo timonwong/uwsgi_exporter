@@ -11,13 +11,14 @@ import (
 
 // UwsgiExporter collects uwsgi metrics for prometheus.
 type UwsgiExporter struct {
-	mutex sync.RWMutex
+	mutex sync.Mutex
 
+	statsReader  StatsReader
 	uri          string
 	timeout      time.Duration
 	collectCores bool
-	statsReader  StatsReader
 
+	uwsgiUp         prometheus.Gauge
 	scrapeDurations *prometheus.SummaryVec
 	descriptorsMap  DescriptorsMap
 }
@@ -29,8 +30,7 @@ type Descriptors map[string]*prometheus.Desc
 type DescriptorsMap map[string]Descriptors
 
 const (
-	namespace = "uwsgi"
-
+	namespace           = "uwsgi"
 	mainSubsystem       = ""
 	socketSubsystem     = "socket"
 	workerSubsystem     = "worker"
@@ -131,6 +131,11 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExp
 		collectCores: collectCores,
 		statsReader:  statsReader,
 
+		uwsgiUp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "up",
+			Help:      "Whether the uwsgi server is up.",
+		}),
 		scrapeDurations: prometheus.NewSummaryVec(prometheus.SummaryOpts{
 			Namespace: namespace,
 			Subsystem: "exporter",
@@ -144,6 +149,7 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExp
 // Describe describes all the metrics ever exported by the exporter.
 // It implements prometheus.Collector.
 func (e *UwsgiExporter) Describe(ch chan<- *prometheus.Desc) {
+	e.uwsgiUp.Describe(ch)
 	e.scrapeDurations.Describe(ch)
 
 	for _, descs := range e.descriptorsMap {
@@ -156,36 +162,36 @@ func (e *UwsgiExporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches the stats from configured uwsgi stats location and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
 func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
-	begin := time.Now()
+	startTime := time.Now()
 	err := e.execute(ch)
-	duration := time.Since(begin)
-	var result string
+	d := time.Since(startTime).Seconds()
 
 	if err != nil {
-		log.Errorf("ERROR: scrape failed after %fs: %s", duration.Seconds(), err)
-		result = "error"
+		log.Errorf("ERROR: scrape failed after %fs: %s", d, err)
+		e.uwsgiUp.Set(0)
+		e.scrapeDurations.WithLabelValues("error").Observe(d)
 	} else {
-		log.Debugf("OK: scrape successful after %fs.", duration.Seconds())
-		result = "success"
+		log.Debugf("OK: scrape successful after %fs.", d)
+		e.uwsgiUp.Set(1)
+		e.scrapeDurations.WithLabelValues("success").Observe(d)
 	}
 
-	e.scrapeDurations.WithLabelValues(result).Observe(duration.Seconds())
+	e.uwsgiUp.Collect(ch)
 	e.scrapeDurations.Collect(ch)
 }
 
-func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) error {
-	e.mutex.Lock() // To prevent metrics from concurrent collects.
-	defer e.mutex.Unlock()
-
+func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
+	e.mutex.Lock() // To prevent stats reading from concurrent collects
 	// Read (and parse) stats from uwsgi server
 	uwsgiStats, err := e.statsReader.Read()
 	if err != nil {
+		e.mutex.Unlock()
 		return err
 	}
+	e.mutex.Unlock()
 
 	// Collect metrics from stats
-	e.collectMetrics(ch, uwsgiStats)
-
+	e.collectMetrics(uwsgiStats, ch)
 	return nil
 }
 
@@ -197,7 +203,7 @@ func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...stri
 	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelsValues...)
 }
 
-func (e *UwsgiExporter) collectMetrics(ch chan<- prometheus.Metric, stats *UwsgiStats) {
+func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
 	// Main
 	mainDescs := e.descriptorsMap[mainSubsystem]
 
