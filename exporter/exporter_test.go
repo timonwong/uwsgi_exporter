@@ -17,6 +17,7 @@ var (
 	testdataDir              string
 	sampleUwsgiStatsFileName string
 	sampleUwsgiStatsJSON     []byte
+	wrongUwsgiStatsJSON      []byte
 )
 
 func init() {
@@ -27,6 +28,10 @@ func init() {
 
 	sampleUwsgiStatsFileName = path.Join(testdataDir, "sample.json")
 	if sampleUwsgiStatsJSON, err = ioutil.ReadFile(sampleUwsgiStatsFileName); err != nil {
+		panic(err)
+	}
+
+	if wrongUwsgiStatsJSON, err = ioutil.ReadFile(path.Join(testdataDir, "wrong.json")); err != nil {
 		panic(err)
 	}
 }
@@ -69,10 +74,33 @@ func readMetric(m prometheus.Metric) MetricResult {
 	panic("Unsupported metric type")
 }
 
+func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
+	s := newUwsgiStatsServer(wrongUwsgiStatsJSON)
+
+	exporter := NewExporter(s.URL, someTimeout, false)
+	ch := make(chan prometheus.Metric)
+
+	go func() {
+		defer close(ch)
+		defer s.Close()
+		exporter.Collect(ch)
+	}()
+
+	// uwsgi_up
+	expected := MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
+	got := readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// scrape duration
+	expected = MetricResult{labels: labelMap{"result": "error"}, value: 0, metricType: dto.MetricType_SUMMARY}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+}
+
 func TestUwsgiExporter_Collect(t *testing.T) {
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
 
-	exporter := NewExporter(s.URL, someTimeout, false)
+	exporter := NewExporter(s.URL, someTimeout, true)
 	ch := make(chan prometheus.Metric)
 
 	go func() {
@@ -150,8 +178,18 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// worker cores
+	labels = labelMap{"stats_uri": s.URL, "worker_id": "1", "core_id": "0"}
 	workerCoreMetricResults := []MetricResult{
-		{labels: workerLabels, value: 2, metricType: dto.MetricType_GAUGE}, // core count
+		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE}, // core count
+
+		{labels: labels, value: 0, metricType: dto.MetricType_GAUGE}, // in_requests
+
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER}, // requests_total
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},
 	}
 	for _, expect := range workerCoreMetricResults {
 		got := readMetric(<-ch)
