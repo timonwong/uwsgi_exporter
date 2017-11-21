@@ -70,16 +70,6 @@
       "read_errors": 0,
       "in_request": 0,
       "vars": []
-    }, {
-      "id": 1,
-      "requests": 0,
-      "static_requests": 0,
-      "routed_requests": 0,
-      "offloaded_requests": 0,
-      "write_errors": 0,
-      "read_errors": 0,
-      "in_request": 0,
-      "vars": []
     }]
   }, {
     "id": 2,
@@ -110,16 +100,6 @@
     }],
     "cores": [{
       "id": 0,
-      "requests": 0,
-      "static_requests": 0,
-      "routed_requests": 0,
-      "offloaded_requests": 0,
-      "write_errors": 0,
-      "read_errors": 0,
-      "in_request": 0,
-      "vars": []
-    }, {
-      "id": 1,
       "requests": 0,
       "static_requests": 0,
       "routed_requests": 0,
