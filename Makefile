@@ -14,16 +14,16 @@
 GO    := GO15VENDOREXPERIMENT=1 go
 PROMU := $(GOPATH)/bin/promu
 
-PREFIX                  ?= $$(pwd)
-BIN_DIR                 ?= $$(pwd)
+PREFIX                  ?= $(shell pwd)
+BIN_DIR                 ?= $(shell pwd)
 DOCKER_IMAGE_NAME       ?= uwsgi-exporter
-DOCKER_IMAGE_TAG        ?= $(subst /,-,$$(git rev-parse --abbrev-ref HEAD))
+DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
 TESTARGS                ?= -race -v
 VETARGS                 ?= -all
 COVERARGS               ?= -coverprofile=profile.out -covermode=atomic
-TEST                    ?= $$(go list ./... | grep -v '/vendor/')
-GOFMT_FILES             ?= $$(find . -name '*.go' | grep -v vendor)
+TEST                    ?= $(shell go list ./... | grep -v '/vendor/')
+GOFMT_FILES             ?= $(shell find . -name '*.go' | grep -v vendor)
 
 all: format build test
 
@@ -44,7 +44,7 @@ cover: fmtcheck
 
 vet:
 	@echo ">> vetting code"
-	@go tool vet $(VETARGS) $$(ls -d */ | grep -v vendor) ; if [ $$? -eq 1 ]; then \
+	@go tool vet $(VETARGS) $(shell ls -d */ | grep -v vendor) ; if [ $$? -eq 1 ]; then \
 		echo ""; \
 		echo "Vet found suspicious constructs. Please check the reported constructs"; \
 		echo "and fix them if necessary before submitting the code for review."; \
