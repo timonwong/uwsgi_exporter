@@ -88,7 +88,7 @@ var (
 
 			"requests_total":           "Total number of requests.",
 			"static_requests_total":    "Total number of static requests.",
-			"routed_reqeusts_total":    "Total number of routed requests.",
+			"routed_requests_total":    "Total number of routed requests.",
 			"offloaded_requests_total": "Total number of offloaded requests.",
 			"write_errors_total":       "Total number of write errors.",
 			"read_errors_total":        "Total number of read errors.",
@@ -276,7 +276,7 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 
 				ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
 				ch <- newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["routed_reqeusts_total"], float64(coreStats.RoutedRequests), labelValues...)
+				ch <- newCounterMetric(workerCoreDescs["routed_requests_total"], float64(coreStats.RoutedRequests), labelValues...)
 				ch <- newCounterMetric(workerCoreDescs["offloaded_requests_total"], float64(coreStats.OffloadedRequests), labelValues...)
 				ch <- newCounterMetric(workerCoreDescs["write_errors_total"], float64(coreStats.WriteErrors), labelValues...)
 				ch <- newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
