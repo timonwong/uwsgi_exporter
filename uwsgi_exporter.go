@@ -41,7 +41,6 @@ func main() {
 	prometheus.MustRegister(uwsgiExporter)
 
 	handler := prometheus.Handler()
-
 	http.Handle(*metricsPath, handler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>

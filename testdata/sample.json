@@ -32,7 +32,13 @@
     "max_queue": 100,
     "shared": 0,
     "can_offload": 0
-  }],
+  }, {
+    "name": "127.0.0.1:36577",
+    "proto": "uwsgi",
+    "queue": 0,
+    "max_queue": 0,
+    "shared": 0,
+    "can_offload": 0}],
   "workers": [{
     "id": 1,
     "pid": 9,

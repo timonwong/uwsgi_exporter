@@ -107,11 +107,11 @@ var (
 
 // NewExporter creates a new uwsgi exporter.
 func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExporter {
-	descriptorsMap := DescriptorsMap{}
+	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
 	for subsystem, metrics := range metricsMap {
-		descriptors := Descriptors{}
+		descriptors := make(Descriptors, len(metrics))
 		for name, help := range metrics {
 			descriptors[name] = prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, subsystem, name), help, labelsMap[subsystem], constLabels)
@@ -223,14 +223,28 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 	ch <- newGaugeMetric(mainDescs["workers"], float64(len(availableWorkers)))
 
 	// Sockets
-	socketDescs := e.descriptorsMap[socketSubsystem]
-	for _, socketStats := range stats.Sockets {
-		labelValues := []string{socketStats.Name, socketStats.Proto}
+	// NOTE(timonwong): Workaround bug #22
+	type socketStatKey struct {
+		Name  string
+		Proto string
+	}
+	sockets := make(map[socketStatKey]UwsgiSocket, len(stats.Sockets))
+	for _, socket := range stats.Sockets {
+		key := socketStatKey{Name: socket.Name, Proto: socket.Proto}
+		if _, ok := sockets[key]; !ok {
+			// First one with the same key take precedence.
+			sockets[key] = socket
+		}
+	}
 
-		ch <- newGaugeMetric(socketDescs["queue_length"], float64(socketStats.Queue), labelValues...)
-		ch <- newGaugeMetric(socketDescs["max_queue_length"], float64(socketStats.MaxQueue), labelValues...)
-		ch <- newGaugeMetric(socketDescs["shared"], float64(socketStats.Shared), labelValues...)
-		ch <- newGaugeMetric(socketDescs["can_offload"], float64(socketStats.CanOffload), labelValues...)
+	socketDescs := e.descriptorsMap[socketSubsystem]
+	for key, socket := range sockets {
+		labelValues := []string{key.Name, key.Proto}
+
+		ch <- newGaugeMetric(socketDescs["queue_length"], float64(socket.Queue), labelValues...)
+		ch <- newGaugeMetric(socketDescs["max_queue_length"], float64(socket.MaxQueue), labelValues...)
+		ch <- newGaugeMetric(socketDescs["shared"], float64(socket.Shared), labelValues...)
+		ch <- newGaugeMetric(socketDescs["can_offload"], float64(socket.CanOffload), labelValues...)
 	}
 
 	// Workers
