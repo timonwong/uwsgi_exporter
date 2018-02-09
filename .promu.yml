@@ -1,7 +1,7 @@
 repository:
   path: github.com/timonwong/uwsgi_exporter
 go:
-  version: 1.8.3
+  version: 1.9.2
   cgo: false
 build:
   flags: -a -tags 'netgo static_build'
