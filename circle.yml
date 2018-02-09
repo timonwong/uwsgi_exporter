@@ -13,7 +13,6 @@ machine:
 
 dependencies:
   pre:
-    - make promu
     - docker info
   override:
     - promu crossbuild
