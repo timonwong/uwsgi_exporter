@@ -17,6 +17,7 @@ type UwsgiStats struct {
 	CWD               string        `json:"cwd"`
 	Sockets           []UwsgiSocket `json:"sockets"`
 	Workers           []UwsgiWorker `json:"workers"`
+	Caches            []UwsgiCache  `json:"caches"`
 }
 
 type UwsgiSocket struct {
@@ -68,8 +69,23 @@ type UwsgiCore struct {
 	OffloadedRequests int      `json:"offloaded_requests"`
 	WriteErrors       int      `json:"write_errors"`
 	ReadErrors        int      `json:"read_errors"`
-	InRequests        int      `json:"in_requests"`
+	InRequest         int      `json:"in_request"`
 	Vars              []string `json:"vars"`
+}
+
+type UwsgiCache struct {
+	Hits           int    `json:"hits"`
+	Misses         int    `json:"miss"`
+	Items          int    `json:"items"`
+	MaxItems       int    `json:"max_items"`
+	Full           int    `json:"full"`
+	Hash           string `json:"hash"`
+	HashSize       int    `json:"hashsize"`
+	KeySize        int    `json:"keysize"`
+	Blocks         int    `json:"blocks"`
+	BlockSize      int    `json:"blocksize"`
+	LastModifiedAt int    `json:"last_modified_at"`
+	Name           string `json:"name"`
 }
 
 func parseUwsgiStatsFromIO(r io.Reader) (*UwsgiStats, error) {
