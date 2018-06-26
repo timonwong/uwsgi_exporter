@@ -150,6 +150,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE},
 		{labels: workerLabels, value: 1457410597, metricType: dto.MetricType_GAUGE}, // last_spawn
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE},
+		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE}, // busy
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
@@ -198,6 +199,26 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 
 	// Drain
 	for i := 0; i < len(workerMetricResults)+len(workerAppMetricResults)+len(workerCoreMetricResults); i++ {
+		readMetric(<-ch)
+	}
+
+	// caches
+	labels = labelMap{"stats_uri": s.URL, "name": "cache_1"}
+	cacheMetricResults := []MetricResult{
+		{labels: labels, value: 56614, metricType: dto.MetricType_COUNTER},   // hits
+		{labels: labels, value: 4931570, metricType: dto.MetricType_COUNTER}, // misses
+		{labels: labels, value: 0, metricType: dto.MetricType_COUNTER},       // full
+
+		{labels: labels, value: 39, metricType: dto.MetricType_GAUGE},   // items
+		{labels: labels, value: 2000, metricType: dto.MetricType_GAUGE}, // max_items
+	}
+	for _, expect := range cacheMetricResults {
+		got := readMetric(<-ch)
+		assert.Equal(t, expect, got, "Wrong cache stats: %d")
+	}
+
+	// Drain
+	for i := 0; i < len(cacheMetricResults); i++ {
 		readMetric(<-ch)
 	}
 
