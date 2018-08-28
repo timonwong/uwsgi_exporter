@@ -47,6 +47,10 @@ func main() {
 			</body>
 			</html>`))
 	})
+	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
+	})
 
 	log.Infoln("Listening on", *listenAddress)
 	err := http.ListenAndServe(*listenAddress, nil)
