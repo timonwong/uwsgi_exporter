@@ -25,6 +25,32 @@
   }, {
     "snmp": 0
   }],
+  "caches":[{
+    "name":"cache_1",
+    "hash":"djb33x",
+    "hashsize":65536,
+    "keysize":2048,
+    "max_items":2000,
+    "blocks":2000,
+    "blocksize":65536,
+    "items":39,
+    "hits":56614,
+    "miss":4931570,
+    "full":0,
+    "last_modified_at":0
+  }, {
+    "name":"cache_2",
+    "hash":"djb33x",
+    "hashsize":65536,
+    "keysize":2048,
+    "max_items":1000,
+    "blocks":1000,
+    "blocksize":65536,
+    "items":0,
+    "hits":5,
+    "miss":9251,
+    "full":0,
+    "last_modified_at":0 }],
   "sockets": [{
     "name": "127.0.0.1:36577",
     "proto": "uwsgi",

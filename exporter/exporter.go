@@ -36,6 +36,7 @@ const (
 	workerSubsystem     = "worker"
 	workerAppSubsystem  = "worker_app"
 	workerCoreSubsystem = "worker_core"
+	cacheSubsystem      = "cache"
 
 	usDivider = float64(time.Second / time.Microsecond)
 )
@@ -68,6 +69,7 @@ var (
 			"apps":  "Number of apps.",
 			"cores": "Number of cores.",
 
+			"busy":                    "Is busy",
 			"requests_total":          "Total number of requests.",
 			"exceptions_total":        "Total number of exceptions.",
 			"harakiri_count_total":    "Total number of harakiri count.",
@@ -84,7 +86,7 @@ var (
 		},
 
 		workerCoreSubsystem: {
-			"in_requests": "In requests?",
+			"busy": "Is core busy",
 
 			"requests_total":           "Total number of requests.",
 			"static_requests_total":    "Total number of static requests.",
@@ -92,6 +94,14 @@ var (
 			"offloaded_requests_total": "Total number of offloaded requests.",
 			"write_errors_total":       "Total number of write errors.",
 			"read_errors_total":        "Total number of read errors.",
+		},
+
+		cacheSubsystem: {
+			"hits":      "Total number of hits.",
+			"misses":    "Total number of misses.",
+			"full":      "Total Number of times cache full was hit.",
+			"items":     "Items in cache.",
+			"max_items": "Max items for this cache.",
 		},
 	}
 
@@ -102,6 +112,7 @@ var (
 		workerSubsystem:     {"worker_id"},
 		workerAppSubsystem:  {"worker_id", "app_id", "mountpoint", "chdir"},
 		workerCoreSubsystem: {"worker_id", "core_id"},
+		cacheSubsystem:      {"name"},
 	}
 )
 
@@ -251,6 +262,7 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 	workerDescs := e.descriptorsMap[workerSubsystem]
 	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
 	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
+	cacheDescs := e.descriptorsMap[cacheSubsystem]
 
 	for _, workerStats := range availableWorkers {
 		labelValues := []string{strconv.Itoa(workerStats.ID)}
@@ -263,6 +275,11 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		ch <- newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
 		ch <- newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
 		ch <- newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
+		if workerStats.Status == "busy" {
+			ch <- newGaugeMetric(workerDescs["busy"], float64(1.0), labelValues...)
+		} else {
+			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+		}
 
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
 		ch <- newCounterMetric(workerDescs["exceptions_total"], float64(workerStats.Exceptions), labelValues...)
@@ -286,7 +303,7 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		if e.collectCores {
 			for _, coreStats := range workerStats.Cores {
 				labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(coreStats.ID)}
-				ch <- newGaugeMetric(workerCoreDescs["in_requests"], float64(coreStats.InRequests), labelValues...)
+				ch <- newGaugeMetric(workerCoreDescs["busy"], float64(coreStats.InRequest), labelValues...)
 
 				ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
 				ch <- newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
@@ -296,5 +313,15 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 				ch <- newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
 			}
 		}
+	}
+
+	for _, cacheStats := range stats.Caches {
+		labelValues := []string{cacheStats.Name}
+		ch <- newCounterMetric(cacheDescs["hits"], float64(cacheStats.Hits), labelValues...)
+		ch <- newCounterMetric(cacheDescs["misses"], float64(cacheStats.Misses), labelValues...)
+		ch <- newCounterMetric(cacheDescs["full"], float64(cacheStats.Full), labelValues...)
+
+		ch <- newGaugeMetric(cacheDescs["items"], float64(cacheStats.Items), labelValues...)
+		ch <- newGaugeMetric(cacheDescs["max_items"], float64(cacheStats.MaxItems), labelValues...)
 	}
 }
