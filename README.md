@@ -25,7 +25,7 @@ make
 
 Name                                       | Description
 -------------------------------------------|--------------------------------------------------------------------------------------------------
---stats.uri                                | URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").
+--stats.uri                                | **required** URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").
 --stats.timeout                            | Timeout for trying to get stats from uwsgi. (default 5s)
 --collect.cores                            | Whether to collect cores information per uwsgi worker. (default: true)
 --log.level                                | Logging verbosity. (default: info)
@@ -45,8 +45,10 @@ For example:
 ```bash
 docker pull timonwong/uwsgi-exporter
 
-docker run -d -p 9117:9117 timonwong/uwsgi-exporter
+docker run -d -p 9117:9117 timonwong/uwsgi-exporter --stats.uri localhost:8001
 ```
+
+(uWSGI Stats Server port, 8001 in this example, is configured in `ini` uWSGI configuration files)
 
 [uWSGI]: https://uwsgi-docs.readthedocs.io
 [circleci]: https://circleci.com/gh/timonwong/uwsgi_exporter
