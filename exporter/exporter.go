@@ -66,8 +66,8 @@ var (
 			"running_time_seconds":          "Worker running time in seconds.",
 			"last_spawn_time_seconds":       "Last spawn time in seconds since epoch.",
 			"average_response_time_seconds": "Average response time in seconds.",
-			"apps":  "Number of apps.",
-			"cores": "Number of cores.",
+			"apps":                          "Number of apps.",
+			"cores":                         "Number of cores.",
 
 			"busy":                    "Is busy",
 			"requests_total":          "Total number of requests.",
