@@ -11,70 +11,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO     ?= GO15VENDOREXPERIMENT=1 go
-GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
+# Needs to be defined before including Makefile.common to auto-generate targets
+DOCKER_ARCHS ?= amd64 armv7 arm64
 
-PROMU ?= $(GOPATH)/bin/promu
+include Makefile.common
 
-PREFIX                  ?= $(shell pwd)
-BIN_DIR                 ?= $(shell pwd)
 DOCKER_IMAGE_NAME       ?= uwsgi-exporter
-DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
-TESTARGS                ?= -race -v
-VETARGS                 ?= -all
-COVERARGS               ?= -coverprofile=profile.out -covermode=atomic
-TEST                    ?= $(shell go list ./... | grep -v '/vendor/')
-GOFMT_FILES             ?= $(shell find . -name '*.go' | grep -v vendor)
+STATICCHECK_IGNORE =
 
-all: format build test
+.PHONY: build
+build: common-build
 
-test: fmtcheck
-	@echo ">> running tests"
-	@$(GO) test $(TEST) $(TESTARGS)
-
-cover: fmtcheck
-	@echo ">> running test coverage"
-	rm -f coverage.txt
-	@for d in $(TEST); do \
-		go test $(TESTARGS) $(COVERARGS) $$d; \
-		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
-			rm profile.out; \
-		fi \
-	done
-
-vet:
-	@echo ">> vetting code"
-	@go tool vet $(VETARGS) $(shell ls -d */ | grep -v vendor) ; if [ $$? -eq 1 ]; then \
-		echo ""; \
-		echo "Vet found suspicious constructs. Please check the reported constructs"; \
-		echo "and fix them if necessary before submitting the code for review."; \
-		exit 1; \
-	fi
-
-build: $(PROMU)
-	@echo ">> building binaries"
-	@$(PROMU) build --prefix $(PREFIX)
-
-tarball: $(PROMU)
-	@echo ">> building release tarball"
-	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
-
-docker:
-	@echo ">> building docker image"
-	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
-
-$(GOPATH)/bin/promu promu:
-	@GOOS= GOARCH= $(GO) get -u github.com/prometheus/promu
-
-format:
-	@echo ">> formatting code"
-	@gofmt -w $(GOFMT_FILES)
-
-fmtcheck:
-	@echo ">> checking code style"
-	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
-
-.PHONY: all format build test cover vet tarball docker fmtcheck
-.PHONY: $(GOPATH)/bin/promu
+.PHONY: test
+test: common-test
