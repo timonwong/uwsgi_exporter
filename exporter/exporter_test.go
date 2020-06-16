@@ -77,7 +77,7 @@ func readMetric(m prometheus.Metric) MetricResult {
 func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	s := newUwsgiStatsServer(wrongUwsgiStatsJSON)
 
-	exporter := NewExporter(s.URL, someTimeout, false)
+	exporter := NewExporter(s.URL, someTimeout, false, "TestUwsgiExporter_CollectWrongJSON")
 	ch := make(chan prometheus.Metric)
 
 	go func() {
@@ -100,7 +100,7 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 func TestUwsgiExporter_Collect(t *testing.T) {
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
 
-	exporter := NewExporter(s.URL, someTimeout, true)
+	exporter := NewExporter(s.URL, someTimeout, true, "")
 	ch := make(chan prometheus.Metric)
 
 	go func() {

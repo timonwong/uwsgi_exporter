@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interfaces.").Default(":9117").String()
-	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
-	statsURI      = kingpin.Flag("stats.uri", "URI for accessing uwsgi stats.").Default("").String()
-	statsTimeout  = kingpin.Flag("stats.timeout", "Timeout for trying to get stats from uwsgi.").Default("5s").Duration()
-	collectCores  = kingpin.Flag("collect.cores", "Collect cores information per uwsgi worker.").Default("false").Bool()
+	listenAddress    = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interfaces.").Default(":9117").String()
+	metricsPath      = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+	statsURI         = kingpin.Flag("stats.uri", "URI for accessing uwsgi stats.").Default("").String()
+	statsTimeout     = kingpin.Flag("stats.timeout", "Timeout for trying to get stats from uwsgi.").Default("5s").Duration()
+	collectCores     = kingpin.Flag("collect.cores", "Collect cores information per uwsgi worker.").Default("false").Bool()
+	applicationLabel = kingpin.Flag("application.label", "Label for WSGI application.").Default("").String()
 )
 
 func init() {
@@ -36,7 +37,7 @@ func main() {
 	log.Infoln("Starting uwsgi_exporter", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 
-	uwsgiExporter := exporter.NewExporter(*statsURI, *statsTimeout, *collectCores)
+	uwsgiExporter := exporter.NewExporter(*statsURI, *statsTimeout, *collectCores, *applicationLabel)
 	prometheus.MustRegister(uwsgiExporter)
 
 	http.Handle(*metricsPath, promhttp.Handler()) // nolint: staticcheck
