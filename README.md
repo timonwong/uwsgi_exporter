@@ -27,6 +27,7 @@ Name                                       | Description
 --stats.uri                                | **required** URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").
 --stats.timeout                            | Timeout for trying to get stats from uwsgi. (default 5s)
 --collect.cores                            | Whether to collect cores information per uwsgi worker. **WARNING** may cause tremendous resource utilization when using gevent engine. (default: false)
+--application.label                        | Label for WSGI application.
 --log.level                                | Logging verbosity. (default: info)
 --web.listen-address                       | Address to listen on for web interface and telemetry. (default: ":9117")
 --web.telemetry-path                       | Path under which to expose metrics.
