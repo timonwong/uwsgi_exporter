@@ -117,9 +117,12 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExporter {
+func NewExporter(uri string, timeout time.Duration, collectCores bool, applicationLabel string) *UwsgiExporter {
 	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
+	if applicationLabel != "" {
+		constLabels["label"] = applicationLabel
+	}
 
 	for subsystem, metrics := range metricsMap {
 		descriptors := make(Descriptors, len(metrics))
