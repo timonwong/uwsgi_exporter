@@ -280,6 +280,17 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		} else {
 			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
 		}
+		if workerStats.Status == "idle" {
+			ch <- newGaugeMetric(workerDescs["idle"], float64(1.0), labelValues...)
+		} else {
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+		}
+		if workerStats.Status == "cheap" {
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(1.0), labelValues...)
+		} else {
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+		}
+
 
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
 		ch <- newCounterMetric(workerDescs["exceptions_total"], float64(workerStats.Exceptions), labelValues...)
