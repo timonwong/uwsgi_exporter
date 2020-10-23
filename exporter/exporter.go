@@ -291,7 +291,6 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
 		}
 
-
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
 		ch <- newCounterMetric(workerDescs["exceptions_total"], float64(workerStats.Exceptions), labelValues...)
 		ch <- newCounterMetric(workerDescs["harakiri_count_total"], float64(workerStats.HarakiriCount), labelValues...)
