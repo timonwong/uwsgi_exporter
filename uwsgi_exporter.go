@@ -1,12 +1,16 @@
 package main
 
 import (
+	"io"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec
+	"os"
 
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -23,42 +27,49 @@ var (
 
 func init() {
 	prometheus.MustRegister(version.NewCollector("uwsgi_exporter"))
+}
 
-	log.AddFlags(kingpin.CommandLine)
+func main() {
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+
 	kingpin.Version(version.Print("uwsgi_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-}
+	logger := promlog.New(promlogConfig)
+	level.Info(logger).Log("msg", "Starting uwsgi_exporter", "version", version.Info())
+	level.Info(logger).Log("msg", "Build context", "build", version.BuildContext())
 
-func main() {
+	uwsgiExporter, err := exporter.NewExporter(logger, *statsURI, *statsTimeout, *collectCores)
+	if err != nil {
+		level.Error(logger).Log("msg", "Failed to start logger", "error", err)
+		os.Exit(1)
+	}
 
-	log.Infoln("Starting uwsgi_exporter", version.Info())
-	log.Infoln("Build context", version.BuildContext())
-
-	uwsgiExporter := exporter.NewExporter(*statsURI, *statsTimeout, *collectCores)
 	prometheus.MustRegister(uwsgiExporter)
 
 	http.Handle(*metricsPath, promhttp.Handler()) // nolint: staticcheck
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		io.WriteString(w, `<html>
 			<head><title>uWSGI Exporter</title></head>
 			<body>
 			<h1>uWSGI Exporter</h1>
-			<p><a href="` + *metricsPath + `">Metrics</a></p>
+			<p><a href="`+*metricsPath+`">Metrics</a></p>
             <h2>Build</h2>
-            <pre>` + version.Info() + ` ` + version.BuildContext() + `</pre>
+            <pre>`+version.Info()+` `+version.BuildContext()+`</pre>
 			</body>
-			</html>`))
+			</html>`)
 	})
 	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte("ok"))
+		io.WriteString(w, "ok")
 	})
 
-	log.Infoln("Listening on", *listenAddress)
-	err := http.ListenAndServe(*listenAddress, nil)
+	level.Info(logger).Log("msg", "Listening on", "addr", *listenAddress)
+	err = http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to listen address", "error", err)
+		os.Exit(1)
 	}
 }

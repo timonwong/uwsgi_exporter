@@ -1,11 +1,10 @@
 package exporter
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"time"
-
-	"github.com/prometheus/common/log"
 )
 
 type tcpStatsReader struct {
@@ -31,21 +30,18 @@ func newTCPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReade
 func (reader *tcpStatsReader) Read() (*UwsgiStats, error) {
 	conn, err := net.Dial("tcp", reader.host)
 	if err != nil {
-		log.Errorf("Error while reading uwsgi stats from tcp %s: %s", reader.host, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading stats from tcp: %w", err)
 	}
 	defer conn.Close()
 
 	err = conn.SetDeadline(time.Now().Add(reader.timeout))
 	if err != nil {
-		log.Errorf("Failed to set deadline: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(conn)
 	if err != nil {
-		log.Errorf("Failed to unmarshal JSON: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return uwsgiStats, nil
 }

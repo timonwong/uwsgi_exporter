@@ -1,10 +1,10 @@
 repository:
   path: github.com/timonwong/uwsgi_exporter
 go:
-  version: 1.13
+  version: 1.18
   cgo: false
 build:
-  flags: -mod=vendor -a -tags 'netgo'
+  flags: -a -tags 'netgo'
   ldflags: |
     -X github.com/prometheus/common/version.Version={{.Version}}
     -X github.com/prometheus/common/version.Revision={{.Revision}}
@@ -16,8 +16,9 @@ tarball:
     - LICENSE
 crossbuild:
   platforms:
-    - darwin/amd64
+    - darwin
     - windows/amd64
+    - windows/arm64
     - windows/386
     - linux/amd64
     - linux/arm

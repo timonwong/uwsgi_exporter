@@ -1,11 +1,10 @@
 package exporter
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"time"
-
-	"github.com/prometheus/common/log"
 )
 
 type fileStatsReader struct {
@@ -29,15 +28,13 @@ func newFileStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 func (reader *fileStatsReader) Read() (*UwsgiStats, error) {
 	f, err := os.Open(reader.filename)
 	if err != nil {
-		log.Errorf("Cannot open file %s: %s", reader.filename, err)
-		return nil, err
+		return nil, fmt.Errorf("unable to open file: %w", err)
 	}
 	defer f.Close()
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(f)
 	if err != nil {
-		log.Errorf("Failed to unmarshal JSON: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to unmarshal JSON: %w", err)
 	}
 
 	return uwsgiStats, nil
