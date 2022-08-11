@@ -5,13 +5,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 // UwsgiExporter collects uwsgi metrics for prometheus.
 type UwsgiExporter struct {
-	mutex sync.Mutex
+	mu sync.Mutex
+
+	logger log.Logger
 
 	statsReader  StatsReader
 	uri          string
@@ -117,7 +120,7 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExporter {
+func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCores bool) (*UwsgiExporter, error) {
 	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
@@ -133,10 +136,12 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExp
 
 	statsReader, err := NewStatsReader(uri, timeout)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return &UwsgiExporter{
+		logger: logger,
+
 		uri:          uri,
 		timeout:      timeout,
 		collectCores: collectCores,
@@ -154,7 +159,7 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool) *UwsgiExp
 			Help:      "uwsgi_exporter: Duration of a scrape job.",
 		}, []string{"result"}),
 		descriptorsMap: descriptorsMap,
-	}
+	}, nil
 }
 
 // Describe describes all the metrics ever exported by the exporter.
@@ -177,12 +182,13 @@ func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 	err := e.execute(ch)
 	d := time.Since(startTime).Seconds()
 
+	logger := log.With(e.logger, "duration", d)
 	if err != nil {
-		log.Errorf("ERROR: scrape failed after %fs: %s", d, err)
+		level.Error(logger).Log("msg", "Scrape failed", "error", err)
 		e.uwsgiUp.Set(0)
 		e.scrapeDurations.WithLabelValues("error").Observe(d)
 	} else {
-		log.Debugf("OK: scrape successful after %fs.", d)
+		level.Debug(logger).Log("msg", "Scrape successful")
 		e.uwsgiUp.Set(1)
 		e.scrapeDurations.WithLabelValues("success").Observe(d)
 	}
@@ -192,14 +198,14 @@ func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
-	e.mutex.Lock() // To prevent stats reading from concurrent collects
+	e.mu.Lock() // To prevent stats reading from concurrent collects
 	// Read (and parse) stats from uwsgi server
 	uwsgiStats, err := e.statsReader.Read()
 	if err != nil {
-		e.mutex.Unlock()
+		e.mu.Unlock()
 		return err
 	}
-	e.mutex.Unlock()
+	e.mu.Unlock()
 
 	// Collect metrics from stats
 	e.collectMetrics(uwsgiStats, ch)
