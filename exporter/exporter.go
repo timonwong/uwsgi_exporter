@@ -281,10 +281,43 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		ch <- newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
 		ch <- newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
 		ch <- newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
-		if workerStats.Status == "busy" {
+		switch workerStats.Status {
+		case "busy":
 			ch <- newGaugeMetric(workerDescs["busy"], float64(1.0), labelValues...)
-		} else {
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(0.0), labelValues...)
+		case "idle":
 			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["idle"], float64(1.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(0.0), labelValues...)
+		case "cheap":
+			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(1.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(0.0), labelValues...)
+		case "pause":
+			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(1.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(0.0), labelValues...)
+		case "sig":
+			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(1.0), labelValues...)
+		default:
+			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
+			ch <- newGaugeMetric(workerDescs["sig"], float64(0.0), labelValues...)
 		}
 
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
