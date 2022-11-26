@@ -73,6 +73,10 @@ var (
 			"cores":                         "Number of cores.",
 
 			"busy":                    "Is busy",
+			"idle":                    "Is idle",
+			"cheap":                   "Is cheaped",
+			"pause":                   "Is paused",
+			"sig":                     "Is processing uWSGI signal",
 			"requests_total":          "Total number of requests.",
 			"exceptions_total":        "Total number of exceptions.",
 			"harakiri_count_total":    "Total number of harakiri count.",
