@@ -317,6 +317,7 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 			ch <- newGaugeMetric(workerDescs["pause"], float64(0.0), labelValues...)
 			ch <- newGaugeMetric(workerDescs["sig"], float64(1.0), labelValues...)
 		default:
+			//unknown state
 			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
 			ch <- newGaugeMetric(workerDescs["idle"], float64(0.0), labelValues...)
 			ch <- newGaugeMetric(workerDescs["cheap"], float64(0.0), labelValues...)
