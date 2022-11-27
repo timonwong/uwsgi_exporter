@@ -278,7 +278,7 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 	for _, workerStats := range availableWorkers {
 		labelValues := []string{strconv.Itoa(workerStats.ID)}
 
-		ch <- newGaugeMetric(workerDescs["pid"], float64(workerStats.Accepting), labelValues...)
+		ch <- newGaugeMetric(workerDescs["pid"], float64(workerStats.PID), labelValues...)
 		ch <- newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
 		ch <- newGaugeMetric(workerDescs["delta_requests"], float64(workerStats.DeltaRequests), labelValues...)
 		ch <- newGaugeMetric(workerDescs["signal_queue_length"], float64(workerStats.SignalQueue), labelValues...)
