@@ -32,3 +32,26 @@ Name                                       | Description
 --web.telemetry-path                       | Path under which to expose metrics.
 --version                                  | Print the version information.
 
+## Using Docker
+
+You can deploy this exporter using the Docker image from following registry:
+
+* [DockerHub]\: [timonwong/uwsgi-exporter](https://registry.hub.docker.com/u/timonwong/uwsgi-exporter/)
+
+For example:
+
+```bash
+docker pull timonwong/uwsgi-exporter
+
+docker run -d -p 9117:9117 timonwong/uwsgi-exporter --stats.uri localhost:8001
+```
+
+(uWSGI Stats Server port, 8001 in this example, is configured in `ini` uWSGI configuration files)
+
+[uWSGI]: https://uwsgi-docs.readthedocs.io
+[circleci]: https://circleci.com/gh/timonwong/uwsgi_exporter
+[hub]: https://hub.docker.com/r/timonwong/uwsgi-exporter/
+[travis]: https://travis-ci.org/timonwong/uwsgi_exporter
+[quay]: https://quay.io/repository/timonwong/uwsgi-exporter
+[DockerHub]: https://hub.docker.com
+[Quay.io]: https://quay.io
