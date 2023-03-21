@@ -13,7 +13,7 @@ type tcpStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newTCPStatsReader)
+	statsReaderCreators = append(statsReaderCreators, newTCPStatsReader)
 }
 
 func newTCPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
@@ -27,14 +27,14 @@ func newTCPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReade
 	}
 }
 
-func (reader *tcpStatsReader) Read() (*UwsgiStats, error) {
-	conn, err := net.Dial("tcp", reader.host)
+func (r *tcpStatsReader) Read() (*UwsgiStats, error) {
+	conn, err := net.Dial("tcp", r.host)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stats from tcp: %w", err)
 	}
 	defer conn.Close()
 
-	err = conn.SetDeadline(time.Now().Add(reader.timeout))
+	err = setDeadLine(r.timeout, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}

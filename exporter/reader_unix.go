@@ -13,7 +13,7 @@ type unixStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newUnixStatsReader)
+	statsReaderCreators = append(statsReaderCreators, newUnixStatsReader)
 }
 
 func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
@@ -27,14 +27,14 @@ func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 	}
 }
 
-func (reader *unixStatsReader) Read() (*UwsgiStats, error) {
-	conn, err := net.Dial("unix", reader.filename)
+func (r *unixStatsReader) Read() (*UwsgiStats, error) {
+	conn, err := net.Dial("unix", r.filename)
 	if err != nil {
-		return nil, fmt.Errorf("error reading stats from unix socket %s: %w", reader.filename, err)
+		return nil, fmt.Errorf("error reading stats from unix socket %s: %w", r.filename, err)
 	}
 	defer conn.Close()
 
-	err = conn.SetDeadline(time.Now().Add(reader.timeout))
+	err = setDeadLine(r.timeout, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}

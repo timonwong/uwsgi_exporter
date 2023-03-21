@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"time"
 )
@@ -14,8 +15,8 @@ type StatsReader interface {
 // StatsReaderCreator is prototype for new stats reader
 type StatsReaderCreator func(u *url.URL, uri string, timeout time.Duration) StatsReader
 
-// StatsReaderCreators is a response chain for stats reader creators.
-var StatsReaderCreators []StatsReaderCreator
+// statsReaderCreators is a response chain for stats reader creators.
+var statsReaderCreators []StatsReaderCreator
 
 // NewStatsReader creates a StatsReader according to uri.
 func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
@@ -24,7 +25,7 @@ func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 		return nil, fmt.Errorf("failed to parse uri: %w", err)
 	}
 
-	for _, statsReaderCreator := range StatsReaderCreators {
+	for _, statsReaderCreator := range statsReaderCreators {
 		reader := statsReaderCreator(u, uri, timeout)
 		if reader != nil {
 			return reader, nil
@@ -32,4 +33,12 @@ func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 	}
 
 	return nil, fmt.Errorf("incompatible uri %s", uri)
+}
+
+func setDeadLine(timeout time.Duration, conn net.Conn) error {
+	if timeout == 0 {
+		return nil
+	}
+
+	return conn.SetDeadline(time.Now().Add(timeout))
 }

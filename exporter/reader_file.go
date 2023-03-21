@@ -12,7 +12,7 @@ type fileStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newFileStatsReader)
+	statsReaderCreators = append(statsReaderCreators, newFileStatsReader)
 }
 
 func newFileStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {

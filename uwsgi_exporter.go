@@ -6,13 +6,13 @@ import (
 	_ "net/http/pprof" //nolint:gosec
 	"os"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/timonwong/uwsgi_exporter/exporter"
 )
@@ -67,7 +67,8 @@ func main() {
 	})
 
 	level.Info(logger).Log("msg", "Listening on", "addr", *listenAddress)
-	err = http.ListenAndServe(*listenAddress, nil)
+
+	err = http.ListenAndServe(*listenAddress, nil) //#nosec
 	if err != nil {
 		level.Error(logger).Log("msg", "Failed to listen address", "error", err)
 		os.Exit(1)
