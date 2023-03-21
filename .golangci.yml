@@ -11,6 +11,7 @@ linters:
     - gosec
     - misspell
     - revive
+    - staticcheck
     - stylecheck
     - unused
 
