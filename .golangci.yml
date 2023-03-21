@@ -12,6 +12,7 @@ linters:
     - misspell
     - revive
     - stylecheck
+    - unused
 
 issues:
   max-issues-per-linter: 0

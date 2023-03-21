@@ -18,7 +18,6 @@ type UwsgiExporter struct {
 
 	statsReader  StatsReader
 	uri          string
-	timeout      time.Duration
 	collectCores bool
 
 	uwsgiUp         prometheus.Gauge
@@ -143,7 +142,6 @@ func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCo
 		logger: logger,
 
 		uri:          uri,
-		timeout:      timeout,
 		collectCores: collectCores,
 		statsReader:  statsReader,
 
