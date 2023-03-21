@@ -55,7 +55,7 @@ workflows:
           docker_version: "20.10.18"
           filters:
             branches:
-              only: main
+              only: [main, master]
           image: circleci/golang:1-node
           quay_io_organization: ''
           docker_hub_organization: timonwong
