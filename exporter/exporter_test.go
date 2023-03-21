@@ -1,16 +1,18 @@
 package exporter
 
 import (
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path"
 	"runtime"
 	"testing"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -27,11 +29,11 @@ func init() {
 	testdataDir = path.Join(path.Dir(filename), "../testdata")
 
 	sampleUwsgiStatsFileName = path.Join(testdataDir, "sample.json")
-	if sampleUwsgiStatsJSON, err = ioutil.ReadFile(sampleUwsgiStatsFileName); err != nil {
+	if sampleUwsgiStatsJSON, err = os.ReadFile(sampleUwsgiStatsFileName); err != nil {
 		panic(err)
 	}
 
-	if wrongUwsgiStatsJSON, err = ioutil.ReadFile(path.Join(testdataDir, "wrong.json")); err != nil {
+	if wrongUwsgiStatsJSON, err = os.ReadFile(path.Join(testdataDir, "wrong.json")); err != nil {
 		panic(err)
 	}
 }
@@ -76,8 +78,10 @@ func readMetric(m prometheus.Metric) MetricResult {
 
 func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	s := newUwsgiStatsServer(wrongUwsgiStatsJSON)
+	logger := log.NewLogfmtLogger(os.Stderr)
+	exporter, err := NewExporter(logger, s.URL, someTimeout, false, "TestUwsgiExporter_CollectWrongJSON")
+	require.NoError(t, err)
 
-	exporter := NewExporter(s.URL, someTimeout, false, "TestUwsgiExporter_CollectWrongJSON")
 	ch := make(chan prometheus.Metric)
 
 	go func() {
@@ -99,8 +103,10 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 
 func TestUwsgiExporter_Collect(t *testing.T) {
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
+	logger := log.NewLogfmtLogger(os.Stderr)
+	exporter, err := NewExporter(logger, s.URL, someTimeout, true, "")
+	require.NoError(t, err)
 
-	exporter := NewExporter(s.URL, someTimeout, true, "")
 	ch := make(chan prometheus.Metric)
 
 	go func() {
@@ -151,6 +157,8 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		{labels: workerLabels, value: 1457410597, metricType: dto.MetricType_GAUGE}, // last_spawn
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE}, // busy
+		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE}, // idle
+		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE}, // cheap
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
@@ -158,9 +166,9 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		{labels: workerLabels, value: 1, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 	}
-	for _, expect := range workerMetricResults {
+	for idx, expect := range workerMetricResults {
 		got := readMetric(<-ch)
-		assert.Equal(t, expect, got, "Wrong worker stats")
+		assert.Equal(t, expect, got, "Wrong worker stats at idx %d", idx)
 	}
 
 	// worker apps

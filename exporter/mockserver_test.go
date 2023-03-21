@@ -6,7 +6,6 @@ package exporter
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"sync"
@@ -22,7 +21,7 @@ const someTimeout = 10 * time.Second
 // It also uses /tmp directory in case it is prohibited to create UNIX
 // sockets in TMPDIR.
 func testUnixAddr() string {
-	f, err := ioutil.TempFile("", "uwsgi-exporter-test")
+	f, err := os.CreateTemp("", "uwsgi-exporter-test")
 	if err != nil {
 		panic(err)
 	}
@@ -38,8 +37,9 @@ func newLocalListener(network string) (net.Listener, error) {
 		return net.Listen("tcp4", "127.0.0.1:0")
 	case "unix":
 		return net.Listen(network, testUnixAddr())
+	default:
+		return nil, fmt.Errorf("%s is not supported", network)
 	}
-	return nil, fmt.Errorf("%s is not supported", network)
 }
 
 type localServer struct {
@@ -67,8 +67,7 @@ func (ls *localServer) teardown() error {
 		ls.Listener.Close()
 		<-ls.done
 		ls.Listener = nil
-		switch network {
-		case "unix":
+		if network == "unix" {
 			os.Remove(address)
 		}
 	}

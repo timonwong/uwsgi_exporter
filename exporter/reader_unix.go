@@ -1,11 +1,10 @@
 package exporter
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"time"
-
-	"github.com/prometheus/common/log"
 )
 
 type unixStatsReader struct {
@@ -14,7 +13,7 @@ type unixStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newUnixStatsReader)
+	statsReaderCreators = append(statsReaderCreators, newUnixStatsReader)
 }
 
 func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
@@ -28,24 +27,21 @@ func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 	}
 }
 
-func (reader *unixStatsReader) Read() (*UwsgiStats, error) {
-	conn, err := net.Dial("unix", string(reader.filename))
+func (r *unixStatsReader) Read() (*UwsgiStats, error) {
+	conn, err := net.Dial("unix", r.filename)
 	if err != nil {
-		log.Errorf("Error while reading uwsgi stats from unix socket %s: %s", reader.filename, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading stats from unix socket %s: %w", r.filename, err)
 	}
 	defer conn.Close()
 
-	err = conn.SetDeadline(time.Now().Add(reader.timeout))
+	err = setDeadLine(r.timeout, conn)
 	if err != nil {
-		log.Errorf("Failed to set deadline: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(conn)
 	if err != nil {
-		log.Errorf("Failed to unmarshal JSON: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return uwsgiStats, nil
 }

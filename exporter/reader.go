@@ -2,10 +2,9 @@ package exporter
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"time"
-
-	"github.com/prometheus/common/log"
 )
 
 // StatsReader reads uwsgi stats from specified uri.
@@ -16,25 +15,30 @@ type StatsReader interface {
 // StatsReaderCreator is prototype for new stats reader
 type StatsReaderCreator func(u *url.URL, uri string, timeout time.Duration) StatsReader
 
-var (
-	// StatsReaderCreators is a response chain for stats reader creators.
-	StatsReaderCreators []StatsReaderCreator
-)
+// statsReaderCreators is a response chain for stats reader creators.
+var statsReaderCreators []StatsReaderCreator
 
 // NewStatsReader creates a StatsReader according to uri.
 func NewStatsReader(uri string, timeout time.Duration) (StatsReader, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
-		log.Errorf("Failed to parse uri %s: %s", uri, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to parse uri: %w", err)
 	}
 
-	for _, statsReaderCreator := range StatsReaderCreators {
+	for _, statsReaderCreator := range statsReaderCreators {
 		reader := statsReaderCreator(u, uri, timeout)
 		if reader != nil {
 			return reader, nil
 		}
 	}
 
-	return nil, fmt.Errorf("Incompatible uri %s", uri)
+	return nil, fmt.Errorf("incompatible uri %s", uri)
+}
+
+func setDeadLine(timeout time.Duration, conn net.Conn) error {
+	if timeout == 0 {
+		return nil
+	}
+
+	return conn.SetDeadline(time.Now().Add(timeout))
 }

@@ -1,12 +1,11 @@
 package exporter
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/prometheus/common/log"
 )
 
 type httpStatsReader struct {
@@ -16,7 +15,7 @@ type httpStatsReader struct {
 }
 
 func init() {
-	StatsReaderCreators = append(StatsReaderCreators, newHTTPStatsReader)
+	statsReaderCreators = append(statsReaderCreators, newHTTPStatsReader)
 }
 
 func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
@@ -46,15 +45,13 @@ func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsRead
 func (reader *httpStatsReader) Read() (*UwsgiStats, error) {
 	resp, err := reader.client.Get(reader.uri)
 	if err != nil {
-		log.Errorf("Error while querying uwsgi stats %s: %s", reader.uri, err)
-		return nil, err
+		return nil, fmt.Errorf("error querying uwsgi stats: %w", err)
 	}
 	defer resp.Body.Close()
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(resp.Body)
 	if err != nil {
-		log.Errorf("Failed to unmarshal JSON: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return uwsgiStats, nil
 }

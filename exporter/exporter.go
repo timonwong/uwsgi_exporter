@@ -5,17 +5,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 // UwsgiExporter collects uwsgi metrics for prometheus.
 type UwsgiExporter struct {
-	mutex sync.Mutex
+	mu sync.Mutex
+
+	logger log.Logger
 
 	statsReader  StatsReader
 	uri          string
-	timeout      time.Duration
 	collectCores bool
 
 	uwsgiUp         prometheus.Gauge
@@ -69,13 +71,17 @@ var (
 			"apps":                          "Number of apps.",
 			"cores":                         "Number of cores.",
 
-			"busy":                    "Is busy",
 			"requests_total":          "Total number of requests.",
 			"exceptions_total":        "Total number of exceptions.",
 			"harakiri_count_total":    "Total number of harakiri count.",
 			"signals_total":           "Total number of signals.",
 			"respawn_count_total":     "Total number of respawn count.",
 			"transmitted_bytes_total": "Worker transmitted bytes.",
+
+			// worker statuses (gauges)
+			"busy":  "Is core in busy",
+			"idle":  "Is core in idle",
+			"cheap": "Is core in cheap mode",
 		},
 
 		workerAppSubsystem: {
@@ -117,7 +123,7 @@ var (
 )
 
 // NewExporter creates a new uwsgi exporter.
-func NewExporter(uri string, timeout time.Duration, collectCores bool, applicationLabel string) *UwsgiExporter {
+func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCores bool, applicationLabel string) (*UwsgiExporter, error) {
 	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
 	if applicationLabel != "" {
@@ -136,12 +142,13 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool, applicati
 
 	statsReader, err := NewStatsReader(uri, timeout)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return &UwsgiExporter{
+		logger: logger,
+
 		uri:          uri,
-		timeout:      timeout,
 		collectCores: collectCores,
 		statsReader:  statsReader,
 
@@ -157,7 +164,7 @@ func NewExporter(uri string, timeout time.Duration, collectCores bool, applicati
 			Help:      "uwsgi_exporter: Duration of a scrape job.",
 		}, []string{"result"}),
 		descriptorsMap: descriptorsMap,
-	}
+	}, nil
 }
 
 // Describe describes all the metrics ever exported by the exporter.
@@ -180,12 +187,13 @@ func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 	err := e.execute(ch)
 	d := time.Since(startTime).Seconds()
 
+	logger := log.With(e.logger, "duration", d)
 	if err != nil {
-		log.Errorf("ERROR: scrape failed after %fs: %s", d, err)
+		level.Error(logger).Log("msg", "Scrape failed", "error", err)
 		e.uwsgiUp.Set(0)
 		e.scrapeDurations.WithLabelValues("error").Observe(d)
 	} else {
-		log.Debugf("OK: scrape successful after %fs.", d)
+		level.Debug(logger).Log("msg", "Scrape successful")
 		e.uwsgiUp.Set(1)
 		e.scrapeDurations.WithLabelValues("success").Observe(d)
 	}
@@ -195,14 +203,14 @@ func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
-	e.mutex.Lock() // To prevent stats reading from concurrent collects
+	e.mu.Lock() // To prevent stats reading from concurrent collects
 	// Read (and parse) stats from uwsgi server
 	uwsgiStats, err := e.statsReader.Read()
 	if err != nil {
-		e.mutex.Unlock()
+		e.mu.Unlock()
 		return err
 	}
-	e.mutex.Unlock()
+	e.mu.Unlock()
 
 	// Collect metrics from stats
 	e.collectMetrics(uwsgiStats, ch)
@@ -216,6 +224,8 @@ func newGaugeMetric(desc *prometheus.Desc, value float64, labelValues ...string)
 func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...string) prometheus.Metric {
 	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelsValues...)
 }
+
+var availableWorkerStatuses = []string{"busy", "idle", "cheap"}
 
 func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
 	// Main
@@ -278,10 +288,13 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		ch <- newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
 		ch <- newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
 		ch <- newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
-		if workerStats.Status == "busy" {
-			ch <- newGaugeMetric(workerDescs["busy"], float64(1.0), labelValues...)
-		} else {
-			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+
+		for _, st := range availableWorkerStatuses {
+			v := float64(0)
+			if workerStats.Status == st {
+				v = float64(1.0)
+			}
+			ch <- newGaugeMetric(workerDescs[st], v, labelValues...)
 		}
 
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
