@@ -157,6 +157,8 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		{labels: workerLabels, value: 1457410597, metricType: dto.MetricType_GAUGE}, // last_spawn
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE}, // busy
+		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE}, // idle
+		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE}, // cheap
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
@@ -164,9 +166,9 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		{labels: workerLabels, value: 1, metricType: dto.MetricType_COUNTER},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_COUNTER},
 	}
-	for _, expect := range workerMetricResults {
+	for idx, expect := range workerMetricResults {
 		got := readMetric(<-ch)
-		assert.Equal(t, expect, got, "Wrong worker stats")
+		assert.Equal(t, expect, got, "Wrong worker stats at idx %d", idx)
 	}
 
 	// worker apps

@@ -71,13 +71,17 @@ var (
 			"apps":                          "Number of apps.",
 			"cores":                         "Number of cores.",
 
-			"busy":                    "Is busy",
 			"requests_total":          "Total number of requests.",
 			"exceptions_total":        "Total number of exceptions.",
 			"harakiri_count_total":    "Total number of harakiri count.",
 			"signals_total":           "Total number of signals.",
 			"respawn_count_total":     "Total number of respawn count.",
 			"transmitted_bytes_total": "Worker transmitted bytes.",
+
+			// worker statuses (gauges)
+			"busy":  "Is core in busy",
+			"idle":  "Is core in idle",
+			"cheap": "Is core in cheap mode",
 		},
 
 		workerAppSubsystem: {
@@ -218,6 +222,8 @@ func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...stri
 	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelsValues...)
 }
 
+var availableWorkerStatuses = []string{"busy", "idle", "cheap"}
+
 func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
 	// Main
 	mainDescs := e.descriptorsMap[mainSubsystem]
@@ -279,10 +285,13 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 		ch <- newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
 		ch <- newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
 		ch <- newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
-		if workerStats.Status == "busy" {
-			ch <- newGaugeMetric(workerDescs["busy"], float64(1.0), labelValues...)
-		} else {
-			ch <- newGaugeMetric(workerDescs["busy"], float64(0.0), labelValues...)
+
+		for _, st := range availableWorkerStatuses {
+			v := float64(0)
+			if workerStats.Status == st {
+				v = float64(1.0)
+			}
+			ch <- newGaugeMetric(workerDescs[st], v, labelValues...)
 		}
 
 		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
