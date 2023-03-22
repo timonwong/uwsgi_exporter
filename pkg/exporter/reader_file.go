@@ -12,14 +12,10 @@ type fileStatsReader struct {
 }
 
 func init() {
-	statsReaderCreators = append(statsReaderCreators, newFileStatsReader)
+	registerStatsReaderFunc("file", newFileStatsReader)
 }
 
-func newFileStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
-	if u.Scheme != "file" {
-		return nil
-	}
-
+func newFileStatsReader(u *url.URL, timeout time.Duration) StatsReader {
 	return &fileStatsReader{
 		filename: u.Path,
 	}

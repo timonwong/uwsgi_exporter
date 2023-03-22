@@ -13,14 +13,10 @@ type tcpStatsReader struct {
 }
 
 func init() {
-	statsReaderCreators = append(statsReaderCreators, newTCPStatsReader)
+	registerStatsReaderFunc("tcp", newTCPStatsReader)
 }
 
-func newTCPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
-	if u.Scheme != "tcp" {
-		return nil
-	}
-
+func newTCPStatsReader(u *url.URL, timeout time.Duration) StatsReader {
 	return &tcpStatsReader{
 		host:    u.Host,
 		timeout: timeout,
@@ -28,7 +24,16 @@ func newTCPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReade
 }
 
 func (r *tcpStatsReader) Read() (*UwsgiStats, error) {
-	conn, err := net.Dial("tcp", r.host)
+	var (
+		err  error
+		conn net.Conn
+	)
+
+	if r.timeout == 0 {
+		conn, err = net.Dial("tcp", r.host)
+	} else {
+		conn, err = net.DialTimeout("tcp", r.host, r.timeout)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error reading stats from tcp: %w", err)
 	}

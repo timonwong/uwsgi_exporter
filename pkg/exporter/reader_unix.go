@@ -13,14 +13,10 @@ type unixStatsReader struct {
 }
 
 func init() {
-	statsReaderCreators = append(statsReaderCreators, newUnixStatsReader)
+	registerStatsReaderFunc("unix", newUnixStatsReader)
 }
 
-func newUnixStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
-	if u.Scheme != "unix" {
-		return nil
-	}
-
+func newUnixStatsReader(u *url.URL, timeout time.Duration) StatsReader {
 	return &unixStatsReader{
 		filename: u.Path,
 		timeout:  timeout,

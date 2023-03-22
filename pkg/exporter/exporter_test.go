@@ -1,41 +1,31 @@
 package exporter
 
 import (
+	_ "embed"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
-	"runtime"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testdataDir              string
 	sampleUwsgiStatsFileName string
-	sampleUwsgiStatsJSON     []byte
-	wrongUwsgiStatsJSON      []byte
+	//go:embed testdata/sample.json
+	sampleUwsgiStatsJSON []byte
+	//go:embed testdata/wrong.json
+	wrongUwsgiStatsJSON []byte
 )
 
 func init() {
-	var err error
-
-	_, filename, _, _ := runtime.Caller(0)
-	testdataDir = path.Join(path.Dir(filename), "../testdata")
-
-	sampleUwsgiStatsFileName = path.Join(testdataDir, "sample.json")
-	if sampleUwsgiStatsJSON, err = os.ReadFile(sampleUwsgiStatsFileName); err != nil {
-		panic(err)
-	}
-
-	if wrongUwsgiStatsJSON, err = os.ReadFile(path.Join(testdataDir, "wrong.json")); err != nil {
-		panic(err)
-	}
+	sampleUwsgiStatsFileName = lo.Must(filepath.Abs("testdata/sample.json"))
 }
 
 func newUwsgiStatsServer(response []byte) *httptest.Server {

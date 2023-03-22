@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -14,12 +15,10 @@ import (
 type UwsgiExporter struct {
 	mu sync.Mutex
 
-	logger log.Logger
-
-	statsReader  StatsReader
-	uri          string
-	collectCores bool
-
+	logger          log.Logger
+	statsReader     StatsReader
+	uri             string
+	collectCores    bool
 	uwsgiUp         prometheus.Gauge
 	scrapeDurations *prometheus.SummaryVec
 	descriptorsMap  DescriptorsMap
@@ -143,12 +142,10 @@ func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCo
 	}
 
 	return &UwsgiExporter{
-		logger: logger,
-
+		logger:       logger,
 		uri:          uri,
 		collectCores: collectCores,
 		statsReader:  statsReader,
-
 		uwsgiUp: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "up",
@@ -199,15 +196,19 @@ func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
 	e.scrapeDurations.Collect(ch)
 }
 
-func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
+// guardedReadStats reads (and parse) stats from uwsgi server
+func (e *UwsgiExporter) guardedReadStats() (*UwsgiStats, error) {
 	e.mu.Lock() // To prevent stats reading from concurrent collects
-	// Read (and parse) stats from uwsgi server
-	uwsgiStats, err := e.statsReader.Read()
+	defer e.mu.Unlock()
+
+	return e.statsReader.Read()
+}
+
+func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
+	uwsgiStats, err := e.guardedReadStats()
 	if err != nil {
-		e.mu.Unlock()
-		return err
+		return fmt.Errorf("error reading stats: %w", err)
 	}
-	e.mu.Unlock()
 
 	// Collect metrics from stats
 	e.collectMetrics(uwsgiStats, ch)
