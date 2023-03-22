@@ -1,3 +1,4 @@
+---
 repository:
   path: github.com/timonwong/uwsgi_exporter
 go:
@@ -16,10 +17,10 @@ tarball:
     - LICENSE
 crossbuild:
   platforms:
-    - darwin
+    - darwin/amd64
+    - darwin/arm64
     - windows/amd64
     - windows/arm64
     - windows/386
     - linux/amd64
-    - linux/arm
     - linux/arm64

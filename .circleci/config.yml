@@ -5,8 +5,7 @@ orbs:
   go: circleci/go@1.7.0
 
 executors:
-  # Whenever the Go version is updated here, .promu.yml
-  # should also be updated.
+  # Whenever the Go version is updated here, .promu.yml should also be updated.
   golang:
     docker:
       - image: cimg/go:1.19-node
@@ -14,7 +13,6 @@ executors:
 jobs:
   test:
     executor: golang
-
     steps:
       - prometheus/setup_environment
       - go/load-cache
@@ -27,9 +25,7 @@ jobs:
             # likely to get OOMed and killed.
             GOOPTS: "-p 2"
             GOMAXPROCS: "2"
-            GO111MODULE: "on"
-      - prometheus/store_artifact:
-          file: uwsgi_exporter
+      - run: git diff --exit-code
       - go/save-cache:
           path: /go/pkg/mod
 
@@ -47,7 +43,7 @@ workflows:
           filters:
             tags:
               only: /^v[0-9]+(\.[0-9]+){2}(-.+|[^-.]*)$/
-      - prometheus/publish_main:
+      - prometheus/publish_master:
           context: timonwong-context
           requires:
             - test
@@ -55,7 +51,7 @@ workflows:
           docker_version: "20.10.18"
           filters:
             branches:
-              only: [main, master]
+              only: master
           image: circleci/golang:1-node
           quay_io_organization: ''
           docker_hub_organization: timonwong
