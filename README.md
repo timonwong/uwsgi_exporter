@@ -28,9 +28,18 @@ Name                                       | Description
 --stats.timeout                            | Timeout for trying to get stats from uwsgi. (default 5s)
 --collect.cores                            | Whether to collect cores information per uwsgi worker. **WARNING** may cause tremendous resource utilization when using gevent engine. (default: false)
 --log.level                                | Logging verbosity. (default: info)
+--web.config.file                          | Path to a [web configuration file](#tls-and-basic-authentication)
 --web.listen-address                       | Address to listen on for web interface and telemetry. (default: ":9117")
 --web.telemetry-path                       | Path under which to expose metrics.
 --version                                  | Print the version information.
+
+## TLS and basic authentication
+
+The uWSGI Exporter supports TLS and basic authentication.
+
+To use TLS and/or basic authentication, you need to pass a configuration file
+using the `--web.config.file` parameter. The format of the file is described
+[in the exporter-toolkit repository](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
 
 ## Using Docker
 
