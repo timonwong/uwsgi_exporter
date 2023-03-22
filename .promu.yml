@@ -5,6 +5,9 @@ go:
   version: 1.19
   cgo: false
 build:
+  binaries:
+    - name: uwsgi_exporter
+      path: ./cmd/uwsgi_exporter
   flags: -a -tags 'netgo'
   ldflags: |
     -X github.com/prometheus/common/version.Version={{.Version}}

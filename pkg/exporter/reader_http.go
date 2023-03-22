@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -15,29 +14,15 @@ type httpStatsReader struct {
 }
 
 func init() {
-	statsReaderCreators = append(statsReaderCreators, newHTTPStatsReader)
+	registerStatsReaderFunc("http", newHTTPStatsReader)
+	registerStatsReaderFunc("https", newHTTPStatsReader)
 }
 
-func newHTTPStatsReader(u *url.URL, uri string, timeout time.Duration) StatsReader {
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil
-	}
-
+func newHTTPStatsReader(u *url.URL, timeout time.Duration) StatsReader {
 	return &httpStatsReader{
-		uri: uri,
+		uri: u.String(),
 		client: &http.Client{
-			Transport: &http.Transport{
-				Dial: func(network, addr string) (net.Conn, error) {
-					c, err := net.DialTimeout(network, addr, timeout)
-					if err != nil {
-						return nil, err
-					}
-					if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
-						return nil, err
-					}
-					return c, nil
-				},
-			},
+			Timeout: timeout,
 		},
 	}
 }
