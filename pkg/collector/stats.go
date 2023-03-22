@@ -1,24 +1,9 @@
-package exporter
+package collector
 
 import (
 	"encoding/json"
 	"io"
 )
-
-type UwsgiStats struct {
-	Version           string        `json:"version"`
-	ListenQueue       int           `json:"listen_queue"`
-	ListenQueueErrors int           `json:"listen_queue_errors"`
-	SignalQueue       int           `json:"signal_queue"`
-	Load              int           `json:"load"`
-	PID               int           `json:"pid"`
-	UID               int           `json:"uid"`
-	GID               int           `json:"gid"`
-	CWD               string        `json:"cwd"`
-	Sockets           []UwsgiSocket `json:"sockets"`
-	Workers           []UwsgiWorker `json:"workers"`
-	Caches            []UwsgiCache  `json:"caches"`
-}
 
 type UwsgiSocket struct {
 	Name       string `json:"name"`
@@ -86,6 +71,21 @@ type UwsgiCache struct {
 	BlockSize      int    `json:"blocksize"`
 	LastModifiedAt int    `json:"last_modified_at"`
 	Name           string `json:"name"`
+}
+
+type UwsgiStats struct {
+	Version           string        `json:"version"`
+	ListenQueue       int           `json:"listen_queue"`
+	ListenQueueErrors int           `json:"listen_queue_errors"`
+	SignalQueue       int           `json:"signal_queue"`
+	Load              int           `json:"load"`
+	PID               int           `json:"pid"`
+	UID               int           `json:"uid"`
+	GID               int           `json:"gid"`
+	CWD               string        `json:"cwd"`
+	Sockets           []UwsgiSocket `json:"sockets"`
+	Workers           []UwsgiWorker `json:"workers"`
+	Caches            []UwsgiCache  `json:"caches"`
 }
 
 func parseUwsgiStatsFromIO(r io.Reader) (*UwsgiStats, error) {

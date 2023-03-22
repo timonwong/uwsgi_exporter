@@ -1,10 +1,10 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 type httpStatsReader struct {
@@ -18,17 +18,20 @@ func init() {
 	registerStatsReaderFunc("https", newHTTPStatsReader)
 }
 
-func newHTTPStatsReader(u *url.URL, timeout time.Duration) StatsReader {
+func newHTTPStatsReader(u *url.URL) StatsReader {
 	return &httpStatsReader{
-		uri: u.String(),
-		client: &http.Client{
-			Timeout: timeout,
-		},
+		uri:    u.String(),
+		client: &http.Client{},
 	}
 }
 
-func (reader *httpStatsReader) Read() (*UwsgiStats, error) {
-	resp, err := reader.client.Get(reader.uri)
+func (r *httpStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.uri, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error querying uwsgi stats: %w", err)
 	}
@@ -36,7 +39,7 @@ func (reader *httpStatsReader) Read() (*UwsgiStats, error) {
 
 	uwsgiStats, err := parseUwsgiStatsFromIO(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		return nil, fmt.Errorf("failed to parse uwsgi stats: %w", err)
 	}
 	return uwsgiStats, nil
 }

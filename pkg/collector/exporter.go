@@ -1,9 +1,9 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/go-kit/log"
@@ -11,27 +11,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// UwsgiExporter collects uwsgi metrics for prometheus.
-type UwsgiExporter struct {
-	mu sync.Mutex
-
-	logger          log.Logger
-	statsReader     StatsReader
-	uri             string
-	collectCores    bool
-	uwsgiUp         prometheus.Gauge
-	scrapeDurations *prometheus.SummaryVec
-	descriptorsMap  DescriptorsMap
-}
-
-// Descriptors is a map for `prometheus.Desc` pointer.
-type Descriptors map[string]*prometheus.Desc
-
-// DescriptorsMap is a map for `Descriptors`.
-type DescriptorsMap map[string]Descriptors
-
 const (
 	namespace           = "uwsgi"
+	exporter            = "exporter"
 	mainSubsystem       = ""
 	socketSubsystem     = "socket"
 	workerSubsystem     = "worker"
@@ -41,6 +23,12 @@ const (
 
 	usDivider = float64(time.Second / time.Microsecond)
 )
+
+// Descriptors is a map for `prometheus.Desc` pointer.
+type Descriptors map[string]*prometheus.Desc
+
+// DescriptorsMap is a map for `Descriptors`.
+type DescriptorsMap map[string]Descriptors
 
 var (
 	metricsMap = map[string]map[string]string{
@@ -121,8 +109,18 @@ var (
 	}
 )
 
-// NewExporter creates a new uwsgi exporter.
-func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCores bool) (*UwsgiExporter, error) {
+// Exporter collects uwsgi metrics for prometheus.
+type Exporter struct {
+	ctx            context.Context
+	logger         log.Logger
+	uri            string
+	collectCores   bool
+	descriptorsMap DescriptorsMap
+	metrics        Metrics
+}
+
+// New creates a new uwsgi collector.
+func New(ctx context.Context, uri string, metrics Metrics, collectCores bool, logger log.Logger) *Exporter {
 	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
@@ -136,36 +134,24 @@ func NewExporter(logger log.Logger, uri string, timeout time.Duration, collectCo
 		descriptorsMap[subsystem] = descriptors
 	}
 
-	statsReader, err := NewStatsReader(uri, timeout)
-	if err != nil {
-		return nil, err
-	}
-
-	return &UwsgiExporter{
-		logger:       logger,
-		uri:          uri,
-		collectCores: collectCores,
-		statsReader:  statsReader,
-		uwsgiUp: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "up",
-			Help:      "Whether the uwsgi server is up.",
-		}),
-		scrapeDurations: prometheus.NewSummaryVec(prometheus.SummaryOpts{
-			Namespace: namespace,
-			Subsystem: "exporter",
-			Name:      "scrape_duration_seconds",
-			Help:      "uwsgi_exporter: Duration of a scrape job.",
-		}, []string{"result"}),
+	return &Exporter{
+		ctx:            ctx,
+		logger:         logger,
+		uri:            uri,
+		collectCores:   collectCores,
 		descriptorsMap: descriptorsMap,
-	}, nil
+		metrics:        metrics,
+	}
 }
 
 // Describe describes all the metrics ever exported by the exporter.
 // It implements prometheus.Collector.
-func (e *UwsgiExporter) Describe(ch chan<- *prometheus.Desc) {
-	e.uwsgiUp.Describe(ch)
-	e.scrapeDurations.Describe(ch)
+func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	ch <- e.metrics.TotalScrapes.Desc()
+	ch <- e.metrics.Error.Desc()
+	ch <- e.metrics.ScrapeDurations.Desc()
+	ch <- e.metrics.ScrapeErrors.Desc()
+	ch <- e.metrics.Up.Desc()
 
 	for _, descs := range e.descriptorsMap {
 		for _, desc := range descs {
@@ -176,43 +162,49 @@ func (e *UwsgiExporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches the stats from configured uwsgi stats location and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
-func (e *UwsgiExporter) Collect(ch chan<- prometheus.Metric) {
-	startTime := time.Now()
-	err := e.execute(ch)
-	d := time.Since(startTime).Seconds()
+func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	e.scrape(e.ctx, ch)
 
-	logger := log.With(e.logger, "duration", d)
-	if err != nil {
-		level.Error(logger).Log("msg", "Scrape failed", "error", err)
-		e.uwsgiUp.Set(0)
-		e.scrapeDurations.WithLabelValues("error").Observe(d)
-	} else {
-		level.Debug(logger).Log("msg", "Scrape successful")
-		e.uwsgiUp.Set(1)
-		e.scrapeDurations.WithLabelValues("success").Observe(d)
-	}
-
-	e.uwsgiUp.Collect(ch)
-	e.scrapeDurations.Collect(ch)
+	ch <- e.metrics.TotalScrapes
+	ch <- e.metrics.Error
+	ch <- e.metrics.ScrapeDurations
+	ch <- e.metrics.ScrapeErrors
+	ch <- e.metrics.Up
 }
 
-// guardedReadStats reads (and parse) stats from uwsgi server
-func (e *UwsgiExporter) guardedReadStats() (*UwsgiStats, error) {
-	e.mu.Lock() // To prevent stats reading from concurrent collects
-	defer e.mu.Unlock()
+// readUwsgiStats reads (and parse) stats from uwsgi server
+func (e *Exporter) readUwsgiStats(ctx context.Context) (*UwsgiStats, error) {
+	statsReader, err := NewStatsReader(e.uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stats reader: %w", err)
+	}
 
-	return e.statsReader.Read()
+	return statsReader.Read(ctx)
 }
 
-func (e *UwsgiExporter) execute(ch chan<- prometheus.Metric) (err error) {
-	uwsgiStats, err := e.guardedReadStats()
+func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
+	e.metrics.TotalScrapes.Inc()
+
+	scrapeTime := time.Now()
+
+	e.metrics.Up.Set(1)
+	e.metrics.Error.Set(0)
+
+	uwsgiStats, err := e.readUwsgiStats(ctx)
 	if err != nil {
-		return fmt.Errorf("error reading stats: %w", err)
+		level.Error(e.logger).Log("msg", "Scrape failed", "error", err)
+
+		e.metrics.ScrapeErrors.Inc()
+		e.metrics.Up.Set(0)
+		e.metrics.Error.Set(1)
+		return
 	}
+
+	level.Debug(e.logger).Log("msg", "Scrape successful")
+	e.metrics.ScrapeDurations.Observe(time.Since(scrapeTime).Seconds())
 
 	// Collect metrics from stats
 	e.collectMetrics(uwsgiStats, ch)
-	return nil
 }
 
 func newGaugeMetric(desc *prometheus.Desc, value float64, labelValues ...string) prometheus.Metric {
@@ -225,7 +217,7 @@ func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...stri
 
 var availableWorkerStatuses = []string{"busy", "idle", "cheap"}
 
-func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
 	// Main
 	mainDescs := e.descriptorsMap[mainSubsystem]
 
@@ -337,5 +329,50 @@ func (e *UwsgiExporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.M
 
 		ch <- newGaugeMetric(cacheDescs["items"], float64(cacheStats.Items), labelValues...)
 		ch <- newGaugeMetric(cacheDescs["max_items"], float64(cacheStats.MaxItems), labelValues...)
+	}
+}
+
+// Metrics represents exporter metrics which values can be carried between http requests.
+type Metrics struct {
+	TotalScrapes    prometheus.Counter
+	ScrapeErrors    prometheus.Counter
+	ScrapeDurations prometheus.Summary
+	Error           prometheus.Gauge
+	Up              prometheus.Gauge
+}
+
+// NewMetrics creates new Metrics instance.
+func NewMetrics() Metrics {
+	subsystem := exporter
+	return Metrics{
+		TotalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "scrapes_total",
+			Help:      "Total number of times uWSGI was scraped for metrics.",
+		}),
+		ScrapeErrors: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "scrape_errors_total",
+			Help:      "Total number of times an error occurred scraping a uWSGI.",
+		}),
+		ScrapeDurations: prometheus.NewSummary(prometheus.SummaryOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "scrape_duration_seconds",
+			Help:      "Duration of uWSGI scrape job.",
+		}),
+		Error: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "last_scrape_error",
+			Help:      "Whether the last scrape of metrics from uWSGI resulted in an error (1 for error, 0 for success).",
+		}),
+		Up: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "up",
+			Help:      "Whether the uWSGI server is up.",
+		}),
 	}
 }

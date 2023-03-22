@@ -1,36 +1,34 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
-	"time"
 )
 
 type unixStatsReader struct {
 	filename string
-	timeout  time.Duration
 }
 
 func init() {
 	registerStatsReaderFunc("unix", newUnixStatsReader)
 }
 
-func newUnixStatsReader(u *url.URL, timeout time.Duration) StatsReader {
+func newUnixStatsReader(u *url.URL) StatsReader {
 	return &unixStatsReader{
 		filename: u.Path,
-		timeout:  timeout,
 	}
 }
 
-func (r *unixStatsReader) Read() (*UwsgiStats, error) {
+func (r *unixStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
 	conn, err := net.Dial("unix", r.filename)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stats from unix socket %s: %w", r.filename, err)
 	}
 	defer conn.Close()
 
-	err = setDeadLine(r.timeout, conn)
+	err = setDeadLine(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}

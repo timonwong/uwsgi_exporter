@@ -1,6 +1,7 @@
-package exporter
+package collector
 
 import (
+	"context"
 	_ "embed"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -69,8 +69,9 @@ func readMetric(m prometheus.Metric) MetricResult {
 func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	s := newUwsgiStatsServer(wrongUwsgiStatsJSON)
 	logger := log.NewLogfmtLogger(os.Stderr)
-	exporter, err := NewExporter(logger, s.URL, someTimeout, false)
-	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
+	defer cancel()
+	exporter := New(ctx, s.URL, NewMetrics(), false, logger)
 
 	ch := make(chan prometheus.Metric)
 
@@ -80,13 +81,28 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 		exporter.Collect(ch)
 	}()
 
-	// uwsgi_up
-	expected := MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
+	// total_scrapes
+	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
 	got := readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
+	// error
+	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
 	// scrape duration
-	expected = MetricResult{labels: labelMap{"result": "error"}, value: 0, metricType: dto.MetricType_SUMMARY}
+	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_SUMMARY}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// scrape_errors
+	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// uwsgi_up
+	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 }
@@ -94,8 +110,9 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 func TestUwsgiExporter_Collect(t *testing.T) {
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
 	logger := log.NewLogfmtLogger(os.Stderr)
-	exporter, err := NewExporter(logger, s.URL, someTimeout, true)
-	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
+	defer cancel()
+	exporter := New(ctx, s.URL, NewMetrics(), true, logger)
 
 	ch := make(chan prometheus.Metric)
 
@@ -117,9 +134,9 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		// workers
 		{labels: labels, value: 2, metricType: dto.MetricType_GAUGE},
 	}
-	for _, expect := range mainMetricResults {
+	for id, expect := range mainMetricResults {
 		got := readMetric(<-ch)
-		assert.Equal(t, expect, got, "Wrong main stats")
+		assert.Equal(t, expect, got, "Wrong main stats at id: %d", id)
 	}
 
 	// sockets
@@ -220,13 +237,28 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 		readMetric(<-ch)
 	}
 
-	// uwsgi_up
-	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
+	// total_scrapes
+	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
 	got := readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
+	// error
+	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
 	// scrape duration
-	expected = MetricResult{labels: labelMap{"result": "success"}, value: 0, metricType: dto.MetricType_SUMMARY}
+	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_SUMMARY}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// scrape_errors
+	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_COUNTER}
+	got = readMetric(<-ch)
+	assert.Equal(t, expected, got)
+
+	// uwsgi_up
+	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 }

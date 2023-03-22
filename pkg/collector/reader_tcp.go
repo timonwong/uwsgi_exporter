@@ -1,6 +1,7 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -16,14 +17,13 @@ func init() {
 	registerStatsReaderFunc("tcp", newTCPStatsReader)
 }
 
-func newTCPStatsReader(u *url.URL, timeout time.Duration) StatsReader {
+func newTCPStatsReader(u *url.URL) StatsReader {
 	return &tcpStatsReader{
-		host:    u.Host,
-		timeout: timeout,
+		host: u.Host,
 	}
 }
 
-func (r *tcpStatsReader) Read() (*UwsgiStats, error) {
+func (r *tcpStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
 	var (
 		err  error
 		conn net.Conn
@@ -39,7 +39,7 @@ func (r *tcpStatsReader) Read() (*UwsgiStats, error) {
 	}
 	defer conn.Close()
 
-	err = setDeadLine(r.timeout, conn)
+	err = setDeadLine(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}

@@ -1,4 +1,4 @@
-package exporter
+package collector
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestNewStatsReaderNil(t *testing.T) {
 	}
 
 	for _, uri := range unknownUris {
-		reader, err := NewStatsReader(uri, someTimeout)
+		reader, err := NewStatsReader(uri)
 		if a.Error(err) {
 			a.Nil(reader)
 		}
