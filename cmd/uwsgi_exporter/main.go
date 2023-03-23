@@ -49,7 +49,8 @@ func main() {
 	level.Info(logger).Log("msg", "Starting uwsgi_exporter", "version", version.Info())
 	level.Info(logger).Log("msg", "Build context", "build", version.BuildContext())
 
-	http.Handle(*metricsPath, newHandler(collector.NewMetrics(), logger))
+	handlerFunc := newHandler(collector.NewMetrics(), logger)
+	http.Handle(*metricsPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handlerFunc))
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{
 			Name:        "uWSGI Exporter",

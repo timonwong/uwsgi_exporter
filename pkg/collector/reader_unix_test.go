@@ -11,13 +11,12 @@ func TestUnixStatsReader_Read(t *testing.T) {
 	a := assert.New(t)
 
 	// Setup a local UDS server for testing
-	ls, err := newLocalServer("unix")
+	ls, err := newLocalServer(t, "unix")
 	a.NoError(err)
 
-	defer ls.teardown()
 	ch := make(chan error, 1)
 
-	ls.buildup(justwriteHandler(sampleUwsgiStatsJSON, ch))
+	ls.buildup(justWriteHandler(sampleUwsgiStatsJSON, ch))
 
 	uri := "unix://" + ls.Listener.Addr().String()
 	reader, err := NewStatsReader(uri)

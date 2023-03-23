@@ -11,20 +11,18 @@ func TestTCPStatsReader_Read(t *testing.T) {
 	a := assert.New(t)
 
 	// Setup a local TCP server for testing
-	ls, err := newLocalServer("tcp")
+	ls, err := newLocalServer(t, "tcp")
 	a.NoError(err)
 
-	defer ls.teardown()
 	ch := make(chan error, 1)
 
-	ls.buildup(justwriteHandler(sampleUwsgiStatsJSON, ch))
+	ls.buildup(justWriteHandler(sampleUwsgiStatsJSON, ch))
 
 	uri := "tcp://" + ls.Listener.Addr().String()
 	reader, err := NewStatsReader(uri)
 	a.NoError(err)
 
-	_, ok := reader.(*tcpStatsReader)
-	a.True(ok)
+	a.IsType(&tcpStatsReader{}, reader)
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()

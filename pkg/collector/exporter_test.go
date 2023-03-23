@@ -38,10 +38,8 @@ func newUwsgiStatsServer(response []byte) *httptest.Server {
 	return s
 }
 
-type labelMap map[string]string
-
 type MetricResult struct {
-	labels     labelMap
+	labels     prometheus.Labels
 	value      float64
 	metricType dto.MetricType
 }
@@ -49,7 +47,7 @@ type MetricResult struct {
 func readMetric(m prometheus.Metric) MetricResult {
 	pb := &dto.Metric{}
 	m.Write(pb)
-	labels := make(labelMap, len(pb.Label))
+	labels := make(prometheus.Labels, len(pb.Label))
 	for _, v := range pb.Label {
 		labels[v.GetName()] = v.GetValue()
 	}
@@ -82,27 +80,27 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	}()
 
 	// total_scrapes
-	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
+	expected := MetricResult{labels: prometheus.Labels{}, value: 1, metricType: dto.MetricType_COUNTER}
 	got := readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// error
-	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 1, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// scrape duration
-	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_SUMMARY}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 0, metricType: dto.MetricType_SUMMARY}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// scrape_errors
-	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 1, metricType: dto.MetricType_COUNTER}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// uwsgi_up
-	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 0, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 }
@@ -123,7 +121,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}()
 
 	// main
-	labels := labelMap{"stats_uri": s.URL}
+	labels := prometheus.Labels{"stats_uri": s.URL}
 	mainMetricResults := []MetricResult{
 		// listen_queue_length
 		{labels: labels, value: 0, metricType: dto.MetricType_GAUGE},
@@ -140,7 +138,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// sockets
-	labels = labelMap{"name": "127.0.0.1:36577", "proto": "uwsgi", "stats_uri": s.URL}
+	labels = prometheus.Labels{"name": "127.0.0.1:36577", "proto": "uwsgi", "stats_uri": s.URL}
 	socketMetricResults := []MetricResult{
 		{labels: labels, value: 0, metricType: dto.MetricType_GAUGE},
 		{labels: labels, value: 100, metricType: dto.MetricType_GAUGE},
@@ -153,7 +151,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// worker
-	workerLabels := labelMap{"stats_uri": s.URL, "worker_id": "1"}
+	workerLabels := prometheus.Labels{"stats_uri": s.URL, "worker_id": "1"}
 	workerMetricResults := []MetricResult{
 		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE},
 		{labels: workerLabels, value: 0, metricType: dto.MetricType_GAUGE},
@@ -179,7 +177,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// worker apps
-	labels = labelMap{"stats_uri": s.URL, "worker_id": "1", "chdir": "", "mountpoint": "", "app_id": "0"}
+	labels = prometheus.Labels{"stats_uri": s.URL, "worker_id": "1", "chdir": "", "mountpoint": "", "app_id": "0"}
 	workerAppMetricResults := []MetricResult{
 		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE}, // app count
 
@@ -194,7 +192,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// worker cores
-	labels = labelMap{"stats_uri": s.URL, "worker_id": "1", "core_id": "0"}
+	labels = prometheus.Labels{"stats_uri": s.URL, "worker_id": "1", "core_id": "0"}
 	workerCoreMetricResults := []MetricResult{
 		{labels: workerLabels, value: 1, metricType: dto.MetricType_GAUGE}, // core count
 
@@ -218,7 +216,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// caches
-	labels = labelMap{"stats_uri": s.URL, "name": "cache_1"}
+	labels = prometheus.Labels{"stats_uri": s.URL, "name": "cache_1"}
 	cacheMetricResults := []MetricResult{
 		{labels: labels, value: 56614, metricType: dto.MetricType_COUNTER},   // hits
 		{labels: labels, value: 4931570, metricType: dto.MetricType_COUNTER}, // misses
@@ -238,27 +236,27 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	}
 
 	// total_scrapes
-	expected := MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_COUNTER}
+	expected := MetricResult{labels: prometheus.Labels{}, value: 1, metricType: dto.MetricType_COUNTER}
 	got := readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// error
-	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_GAUGE}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 0, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// scrape duration
-	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_SUMMARY}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 0, metricType: dto.MetricType_SUMMARY}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// scrape_errors
-	expected = MetricResult{labels: labelMap{}, value: 0, metricType: dto.MetricType_COUNTER}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 0, metricType: dto.MetricType_COUNTER}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 
 	// uwsgi_up
-	expected = MetricResult{labels: labelMap{}, value: 1, metricType: dto.MetricType_GAUGE}
+	expected = MetricResult{labels: prometheus.Labels{}, value: 1, metricType: dto.MetricType_GAUGE}
 	got = readMetric(<-ch)
 	assert.Equal(t, expected, got)
 }
