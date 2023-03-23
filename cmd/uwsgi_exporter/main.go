@@ -89,7 +89,7 @@ func newHandler(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
 		// Use request context for cancellation when connection gets closed.
 		timeoutSeconds, err := getTimeout(r, *timeoutOffset, logger)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to parse timeout from Prometheus header: %s", err), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -98,7 +98,10 @@ func newHandler(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
 		r = r.WithContext(ctx)
 
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(collector.New(ctx, *statsURI, metrics, *collectCores, logger))
+
+		if *statsURI != "" {
+			registry.MustRegister(collector.New(ctx, *statsURI, metrics, *collectCores, logger))
+		}
 
 		gatherers := prometheus.Gatherers{
 			prometheus.DefaultGatherer,
@@ -121,7 +124,7 @@ func handleProbe(metrics collector.Metrics, logger log.Logger) http.HandlerFunc 
 
 		timeoutSeconds, err := getTimeout(r, *timeoutOffset, logger)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to parse timeout from Prometheus header: %s", err), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -143,7 +146,7 @@ func getTimeout(r *http.Request, offset float64, logger log.Logger) (timeoutSeco
 		var err error
 		timeoutSeconds, err = strconv.ParseFloat(v, 64)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to parse timeout from Prometheus header: %w", err)
 		}
 	}
 	if timeoutSeconds == 0 {
