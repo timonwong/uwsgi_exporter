@@ -8,6 +8,8 @@ import (
 )
 
 func TestTCPStatsReader_Read(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 
 	// Setup a local TCP server for testing

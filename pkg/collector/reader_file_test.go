@@ -8,6 +8,8 @@ import (
 )
 
 func TestFileStatsReader_Read(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 
 	uri := "file://" + sampleUwsgiStatsFileName

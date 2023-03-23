@@ -7,6 +7,8 @@ import (
 )
 
 func TestNewStatsReaderNil(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 	unknownUris := []string{
 		"abc://xxx",

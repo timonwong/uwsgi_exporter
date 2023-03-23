@@ -8,6 +8,8 @@ import (
 )
 
 func TestUnixStatsReader_Read(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 
 	// Setup a local UDS server for testing

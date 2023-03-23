@@ -8,6 +8,8 @@ import (
 )
 
 func TestHTTPStatsReader_Read(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
