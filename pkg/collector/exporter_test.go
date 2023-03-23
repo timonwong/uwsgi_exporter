@@ -14,6 +14,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -71,10 +72,13 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	logger := log.NewLogfmtLogger(os.Stderr)
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
-	exporter := New(ctx, s.URL, NewMetrics(), ExporterOptions{
-		Logger:            logger,
-		CollectCores:      false,
-		RequireSafeScheme: false,
+
+	statsReader, err := NewStatsReader(s.URL)
+	require.NoError(t, err)
+
+	exporter := New(ctx, s.URL, statsReader, NewMetrics(), ExporterOptions{
+		Logger:       logger,
+		CollectCores: false,
 	})
 
 	ch := make(chan prometheus.Metric)
@@ -116,10 +120,13 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	logger := log.NewLogfmtLogger(os.Stderr)
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
-	exporter := New(ctx, s.URL, NewMetrics(), ExporterOptions{
-		Logger:            logger,
-		CollectCores:      true,
-		RequireSafeScheme: false,
+
+	statsReader, err := NewStatsReader(s.URL)
+	require.NoError(t, err)
+
+	exporter := New(ctx, s.URL, statsReader, NewMetrics(), ExporterOptions{
+		Logger:       logger,
+		CollectCores: true,
 	})
 
 	ch := make(chan prometheus.Metric)

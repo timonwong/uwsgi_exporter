@@ -65,7 +65,7 @@ func main() {
 		}
 		landingPage, err := web.NewLandingPage(landingConfig)
 		if err != nil {
-			level.Error(logger).Log("err", err)
+			level.Error(logger).Log("error", err)
 			os.Exit(1)
 		}
 		http.Handle("/", landingPage)
@@ -100,10 +100,16 @@ func newHandler(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
 		registry := prometheus.NewRegistry()
 
 		if *statsURI != "" {
-			registry.MustRegister(collector.New(ctx, *statsURI, metrics, collector.ExporterOptions{
-				Logger:            logger,
-				CollectCores:      *collectCores,
-				RequireSafeScheme: false,
+			statsReader, err := collector.NewStatsReader(*statsURI)
+			if err != nil {
+				level.Error(logger).Log("msg", "Failed to create stats reader", "error", err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			registry.MustRegister(collector.New(ctx, *statsURI, statsReader, metrics, collector.ExporterOptions{
+				Logger:       logger,
+				CollectCores: *collectCores,
 			}))
 		}
 
@@ -136,11 +142,17 @@ func handleProbe(metrics collector.Metrics, logger log.Logger) http.HandlerFunc 
 		defer cancel()
 		r = r.WithContext(ctx)
 
+		statsReader, err := collector.NewStatsReader(target, collector.WithRequireSafeScheme(true))
+		if err != nil {
+			level.Error(logger).Log("msg", "Failed to create stats reader", "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(collector.New(ctx, target, metrics, collector.ExporterOptions{
-			Logger:            logger,
-			CollectCores:      *collectCores,
-			RequireSafeScheme: true,
+		registry.MustRegister(collector.New(ctx, target, statsReader, metrics, collector.ExporterOptions{
+			Logger:       logger,
+			CollectCores: *collectCores,
 		}))
 
 		h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
