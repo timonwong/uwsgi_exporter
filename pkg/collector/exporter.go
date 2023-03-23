@@ -107,14 +107,31 @@ var (
 		workerCoreSubsystem: {"worker_id", "core_id"},
 		cacheSubsystem:      {"name"},
 	}
+
+	descriptorsMap = make(DescriptorsMap, len(metricsMap))
 )
+
+func init() {
+	for subsystem, metrics := range metricsMap {
+		descriptors := make(Descriptors, len(metrics))
+		for name, help := range metrics {
+			labels := append([]string{"stats_uri"}, labelsMap[subsystem]...)
+			descriptors[name] = prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, subsystem, name),
+				help,
+				labels,
+				nil)
+		}
+
+		descriptorsMap[subsystem] = descriptors
+	}
+}
 
 // Exporter collects uwsgi metrics for prometheus.
 type Exporter struct {
-	ctx            context.Context
-	uri            string
-	descriptorsMap DescriptorsMap
-	metrics        Metrics
+	ctx     context.Context
+	uri     string
+	metrics Metrics
 
 	ExporterOptions
 }
@@ -127,23 +144,9 @@ type ExporterOptions struct {
 
 // New creates a new uwsgi collector.
 func New(ctx context.Context, uri string, metrics Metrics, options ExporterOptions) *Exporter {
-	descriptorsMap := make(DescriptorsMap, len(metricsMap))
-	constLabels := prometheus.Labels{"stats_uri": uri}
-
-	for subsystem, metrics := range metricsMap {
-		descriptors := make(Descriptors, len(metrics))
-		for name, help := range metrics {
-			descriptors[name] = prometheus.NewDesc(
-				prometheus.BuildFQName(namespace, subsystem, name), help, labelsMap[subsystem], constLabels)
-		}
-
-		descriptorsMap[subsystem] = descriptors
-	}
-
 	return &Exporter{
 		ctx:             ctx,
 		uri:             uri,
-		descriptorsMap:  descriptorsMap,
 		metrics:         metrics,
 		ExporterOptions: options,
 	}
@@ -158,7 +161,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.metrics.ScrapeErrors.Desc()
 	ch <- e.metrics.Up.Desc()
 
-	for _, descs := range e.descriptorsMap {
+	for _, descs := range descriptorsMap {
 		for _, desc := range descs {
 			ch <- desc
 		}
@@ -212,19 +215,21 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	e.collectMetrics(uwsgiStats, ch)
 }
 
-func newGaugeMetric(desc *prometheus.Desc, value float64, labelValues ...string) prometheus.Metric {
+func (e *Exporter) newGaugeMetric(desc *prometheus.Desc, value float64, labelValues ...string) prometheus.Metric {
+	labelValues = append([]string{e.uri}, labelValues...)
 	return prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, value, labelValues...)
 }
 
-func newCounterMetric(desc *prometheus.Desc, value float64, labelsValues ...string) prometheus.Metric {
-	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelsValues...)
+func (e *Exporter) newCounterMetric(desc *prometheus.Desc, value float64, labelValues ...string) prometheus.Metric {
+	labelValues = append([]string{e.uri}, labelValues...)
+	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, value, labelValues...)
 }
 
 var availableWorkerStatuses = []string{"busy", "idle", "cheap"}
 
 func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric) {
 	// Main
-	mainDescs := e.descriptorsMap[mainSubsystem]
+	mainDescs := descriptorsMap[mainSubsystem]
 
 	availableWorkers := make([]UwsgiWorker, 0, len(stats.Workers))
 	// Filter workers (filter out "stand-by" workers, in uwsgi's adaptive process respawn mode)
@@ -236,10 +241,10 @@ func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric
 		availableWorkers = append(availableWorkers, workerStats)
 	}
 
-	ch <- newGaugeMetric(mainDescs["listen_queue_length"], float64(stats.ListenQueue))
-	ch <- newGaugeMetric(mainDescs["listen_queue_errors"], float64(stats.ListenQueueErrors))
-	ch <- newGaugeMetric(mainDescs["signal_queue_length"], float64(stats.SignalQueue))
-	ch <- newGaugeMetric(mainDescs["workers"], float64(len(availableWorkers)))
+	ch <- e.newGaugeMetric(mainDescs["listen_queue_length"], float64(stats.ListenQueue))
+	ch <- e.newGaugeMetric(mainDescs["listen_queue_errors"], float64(stats.ListenQueueErrors))
+	ch <- e.newGaugeMetric(mainDescs["signal_queue_length"], float64(stats.SignalQueue))
+	ch <- e.newGaugeMetric(mainDescs["workers"], float64(len(availableWorkers)))
 
 	// Sockets
 	// NOTE(timonwong): Workaround bug #22
@@ -256,84 +261,84 @@ func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric
 		}
 	}
 
-	socketDescs := e.descriptorsMap[socketSubsystem]
+	socketDescs := descriptorsMap[socketSubsystem]
 	for key, socket := range sockets {
 		labelValues := []string{key.Name, key.Proto}
 
-		ch <- newGaugeMetric(socketDescs["queue_length"], float64(socket.Queue), labelValues...)
-		ch <- newGaugeMetric(socketDescs["max_queue_length"], float64(socket.MaxQueue), labelValues...)
-		ch <- newGaugeMetric(socketDescs["shared"], float64(socket.Shared), labelValues...)
-		ch <- newGaugeMetric(socketDescs["can_offload"], float64(socket.CanOffload), labelValues...)
+		ch <- e.newGaugeMetric(socketDescs["queue_length"], float64(socket.Queue), labelValues...)
+		ch <- e.newGaugeMetric(socketDescs["max_queue_length"], float64(socket.MaxQueue), labelValues...)
+		ch <- e.newGaugeMetric(socketDescs["shared"], float64(socket.Shared), labelValues...)
+		ch <- e.newGaugeMetric(socketDescs["can_offload"], float64(socket.CanOffload), labelValues...)
 	}
 
 	// Workers
-	workerDescs := e.descriptorsMap[workerSubsystem]
-	workerAppDescs := e.descriptorsMap[workerAppSubsystem]
-	workerCoreDescs := e.descriptorsMap[workerCoreSubsystem]
-	cacheDescs := e.descriptorsMap[cacheSubsystem]
+	workerDescs := descriptorsMap[workerSubsystem]
+	workerAppDescs := descriptorsMap[workerAppSubsystem]
+	workerCoreDescs := descriptorsMap[workerCoreSubsystem]
+	cacheDescs := descriptorsMap[cacheSubsystem]
 
 	for _, workerStats := range availableWorkers {
 		labelValues := []string{strconv.Itoa(workerStats.ID)}
 
-		ch <- newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
-		ch <- newGaugeMetric(workerDescs["delta_requests"], float64(workerStats.DeltaRequests), labelValues...)
-		ch <- newGaugeMetric(workerDescs["signal_queue_length"], float64(workerStats.SignalQueue), labelValues...)
-		ch <- newGaugeMetric(workerDescs["rss_bytes"], float64(workerStats.RSS), labelValues...)
-		ch <- newGaugeMetric(workerDescs["vsz_bytes"], float64(workerStats.VSZ), labelValues...)
-		ch <- newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
-		ch <- newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
-		ch <- newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["accepting"], float64(workerStats.Accepting), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["delta_requests"], float64(workerStats.DeltaRequests), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["signal_queue_length"], float64(workerStats.SignalQueue), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["rss_bytes"], float64(workerStats.RSS), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["vsz_bytes"], float64(workerStats.VSZ), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["running_time_seconds"], float64(workerStats.RunningTime)/usDivider, labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["last_spawn_time_seconds"], float64(workerStats.LastSpawn), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["average_response_time_seconds"], float64(workerStats.AvgRt)/usDivider, labelValues...)
 
 		for _, st := range availableWorkerStatuses {
 			v := float64(0)
 			if workerStats.Status == st {
 				v = 1.0
 			}
-			ch <- newGaugeMetric(workerDescs[st], v, labelValues...)
+			ch <- e.newGaugeMetric(workerDescs[st], v, labelValues...)
 		}
 
-		ch <- newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
-		ch <- newCounterMetric(workerDescs["exceptions_total"], float64(workerStats.Exceptions), labelValues...)
-		ch <- newCounterMetric(workerDescs["harakiri_count_total"], float64(workerStats.HarakiriCount), labelValues...)
-		ch <- newCounterMetric(workerDescs["signals_total"], float64(workerStats.Signals), labelValues...)
-		ch <- newCounterMetric(workerDescs["respawn_count_total"], float64(workerStats.RespawnCount), labelValues...)
-		ch <- newCounterMetric(workerDescs["transmitted_bytes_total"], float64(workerStats.TX), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["requests_total"], float64(workerStats.Requests), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["exceptions_total"], float64(workerStats.Exceptions), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["harakiri_count_total"], float64(workerStats.HarakiriCount), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["signals_total"], float64(workerStats.Signals), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["respawn_count_total"], float64(workerStats.RespawnCount), labelValues...)
+		ch <- e.newCounterMetric(workerDescs["transmitted_bytes_total"], float64(workerStats.TX), labelValues...)
 
 		// Worker Apps
-		ch <- newGaugeMetric(workerDescs["apps"], float64(len(workerStats.Apps)), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["apps"], float64(len(workerStats.Apps)), labelValues...)
 		for _, appStats := range workerStats.Apps {
 			labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(appStats.ID), appStats.Mountpoint, appStats.Chdir}
-			ch <- newGaugeMetric(workerAppDescs["startup_time_seconds"], float64(appStats.StartupTime), labelValues...)
+			ch <- e.newGaugeMetric(workerAppDescs["startup_time_seconds"], float64(appStats.StartupTime), labelValues...)
 
-			ch <- newCounterMetric(workerAppDescs["requests_total"], float64(appStats.Requests), labelValues...)
-			ch <- newCounterMetric(workerAppDescs["exceptions_total"], float64(appStats.Exceptions), labelValues...)
+			ch <- e.newCounterMetric(workerAppDescs["requests_total"], float64(appStats.Requests), labelValues...)
+			ch <- e.newCounterMetric(workerAppDescs["exceptions_total"], float64(appStats.Exceptions), labelValues...)
 		}
 
 		// Worker Cores
-		ch <- newGaugeMetric(workerDescs["cores"], float64(len(workerStats.Cores)), labelValues...)
+		ch <- e.newGaugeMetric(workerDescs["cores"], float64(len(workerStats.Cores)), labelValues...)
 		if e.CollectCores {
 			for _, coreStats := range workerStats.Cores {
 				labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(coreStats.ID)}
-				ch <- newGaugeMetric(workerCoreDescs["busy"], float64(coreStats.InRequest), labelValues...)
+				ch <- e.newGaugeMetric(workerCoreDescs["busy"], float64(coreStats.InRequest), labelValues...)
 
-				ch <- newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["routed_requests_total"], float64(coreStats.RoutedRequests), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["offloaded_requests_total"], float64(coreStats.OffloadedRequests), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["write_errors_total"], float64(coreStats.WriteErrors), labelValues...)
-				ch <- newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["requests_total"], float64(coreStats.Requests), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["static_requests_total"], float64(coreStats.StaticRequests), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["routed_requests_total"], float64(coreStats.RoutedRequests), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["offloaded_requests_total"], float64(coreStats.OffloadedRequests), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["write_errors_total"], float64(coreStats.WriteErrors), labelValues...)
+				ch <- e.newCounterMetric(workerCoreDescs["read_errors_total"], float64(coreStats.ReadErrors), labelValues...)
 			}
 		}
 	}
 
 	for _, cacheStats := range stats.Caches {
 		labelValues := []string{cacheStats.Name}
-		ch <- newCounterMetric(cacheDescs["hits"], float64(cacheStats.Hits), labelValues...)
-		ch <- newCounterMetric(cacheDescs["misses"], float64(cacheStats.Misses), labelValues...)
-		ch <- newCounterMetric(cacheDescs["full"], float64(cacheStats.Full), labelValues...)
+		ch <- e.newCounterMetric(cacheDescs["hits"], float64(cacheStats.Hits), labelValues...)
+		ch <- e.newCounterMetric(cacheDescs["misses"], float64(cacheStats.Misses), labelValues...)
+		ch <- e.newCounterMetric(cacheDescs["full"], float64(cacheStats.Full), labelValues...)
 
-		ch <- newGaugeMetric(cacheDescs["items"], float64(cacheStats.Items), labelValues...)
-		ch <- newGaugeMetric(cacheDescs["max_items"], float64(cacheStats.MaxItems), labelValues...)
+		ch <- e.newGaugeMetric(cacheDescs["items"], float64(cacheStats.Items), labelValues...)
+		ch <- e.newGaugeMetric(cacheDescs["max_items"], float64(cacheStats.MaxItems), labelValues...)
 	}
 }
 
