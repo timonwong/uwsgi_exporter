@@ -73,7 +73,7 @@ using the `--web.config.file` parameter. The format of the file is described
 
 You can deploy this exporter using the Docker image from following registry:
 
--   [DockerHub]\: [timonwong/uwsgi-exporter](https://registry.hub.docker.com/u/timonwong/uwsgi-exporter/)
+- [DockerHub]\: [timonwong/uwsgi-exporter](https://registry.hub.docker.com/u/timonwong/uwsgi-exporter/)
 
 For example:
 

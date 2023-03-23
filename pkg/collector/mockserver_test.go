@@ -55,7 +55,6 @@ func (ls *localServer) buildup(handler func(*localServer, net.Listener)) {
 		handler(ls, ls.Listener)
 		close(ls.done)
 	}()
-	return
 }
 
 func (ls *localServer) teardown() error {
