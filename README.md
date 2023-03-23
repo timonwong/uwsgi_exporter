@@ -22,9 +22,9 @@ make
 ./uwsgi_exporter <flags>
 ```
 
-#### Multi-target support
+#### Multi-target support (BETA)
 
-This exporter supports the multi-target pattern. This allows running a single instance of this exporter for multiple uWSGI targets.
+This exporter supports the [multi-target pattern](https://prometheus.io/docs/guides/multi-target-exporter/). This allows running a single instance of this exporter for multiple uWSGI targets.
 
 To use the multi-target functionality, send an http request to the endpoint /probe?target=http://uwsgi1.example.com:5432 where target is set to the URI of the uWSGI instance to scrape metrics from.
 

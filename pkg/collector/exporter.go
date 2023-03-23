@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -129,24 +128,24 @@ func init() {
 
 // Exporter collects uwsgi metrics for prometheus.
 type Exporter struct {
-	ctx     context.Context
-	uri     string
-	metrics Metrics
-
+	ctx         context.Context
+	uri         string
+	statsReader StatsReader
+	metrics     Metrics
 	ExporterOptions
 }
 
 type ExporterOptions struct {
-	Logger            log.Logger
-	CollectCores      bool
-	RequireSafeScheme bool
+	Logger       log.Logger
+	CollectCores bool
 }
 
 // New creates a new uwsgi collector.
-func New(ctx context.Context, uri string, metrics Metrics, options ExporterOptions) *Exporter {
+func New(ctx context.Context, uri string, statsReader StatsReader, metrics Metrics, options ExporterOptions) *Exporter {
 	return &Exporter{
 		ctx:             ctx,
 		uri:             uri,
+		statsReader:     statsReader,
 		metrics:         metrics,
 		ExporterOptions: options,
 	}
@@ -180,16 +179,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.metrics.Up
 }
 
-// readUwsgiStats reads (and parse) stats from uwsgi server
-func (e *Exporter) readUwsgiStats(ctx context.Context) (*UwsgiStats, error) {
-	statsReader, err := NewStatsReader(e.uri, WithRequireSafeScheme(e.RequireSafeScheme))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stats reader: %w", err)
-	}
-
-	return statsReader.Read(ctx)
-}
-
 func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	e.metrics.TotalScrapes.Inc()
 
@@ -198,7 +187,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	e.metrics.Up.Set(1)
 	e.metrics.Error.Set(0)
 
-	uwsgiStats, err := e.readUwsgiStats(ctx)
+	uwsgiStats, err := e.statsReader.Read(ctx)
 	if err != nil {
 		level.Error(e.Logger).Log("msg", "Scrape failed", "error", err)
 
