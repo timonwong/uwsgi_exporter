@@ -112,15 +112,21 @@ var (
 // Exporter collects uwsgi metrics for prometheus.
 type Exporter struct {
 	ctx            context.Context
-	logger         log.Logger
 	uri            string
-	collectCores   bool
 	descriptorsMap DescriptorsMap
 	metrics        Metrics
+
+	ExporterOptions
+}
+
+type ExporterOptions struct {
+	Logger            log.Logger
+	CollectCores      bool
+	RequireSafeScheme bool
 }
 
 // New creates a new uwsgi collector.
-func New(ctx context.Context, uri string, metrics Metrics, collectCores bool, logger log.Logger) *Exporter {
+func New(ctx context.Context, uri string, metrics Metrics, options ExporterOptions) *Exporter {
 	descriptorsMap := make(DescriptorsMap, len(metricsMap))
 	constLabels := prometheus.Labels{"stats_uri": uri}
 
@@ -135,12 +141,11 @@ func New(ctx context.Context, uri string, metrics Metrics, collectCores bool, lo
 	}
 
 	return &Exporter{
-		ctx:            ctx,
-		logger:         logger,
-		uri:            uri,
-		collectCores:   collectCores,
-		descriptorsMap: descriptorsMap,
-		metrics:        metrics,
+		ctx:             ctx,
+		uri:             uri,
+		descriptorsMap:  descriptorsMap,
+		metrics:         metrics,
+		ExporterOptions: options,
 	}
 }
 
@@ -174,7 +179,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 // readUwsgiStats reads (and parse) stats from uwsgi server
 func (e *Exporter) readUwsgiStats(ctx context.Context) (*UwsgiStats, error) {
-	statsReader, err := NewStatsReader(e.uri)
+	statsReader, err := NewStatsReader(e.uri, WithRequireSafeScheme(e.RequireSafeScheme))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stats reader: %w", err)
 	}
@@ -192,7 +197,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 
 	uwsgiStats, err := e.readUwsgiStats(ctx)
 	if err != nil {
-		level.Error(e.logger).Log("msg", "Scrape failed", "error", err)
+		level.Error(e.Logger).Log("msg", "Scrape failed", "error", err)
 
 		e.metrics.ScrapeErrors.Inc()
 		e.metrics.Up.Set(0)
@@ -200,7 +205,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 		return
 	}
 
-	level.Debug(e.logger).Log("msg", "Scrape successful")
+	level.Debug(e.Logger).Log("msg", "Scrape successful")
 	e.metrics.ScrapeDurations.Observe(time.Since(scrapeTime).Seconds())
 
 	// Collect metrics from stats
@@ -282,7 +287,7 @@ func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric
 		for _, st := range availableWorkerStatuses {
 			v := float64(0)
 			if workerStats.Status == st {
-				v = float64(1.0)
+				v = 1.0
 			}
 			ch <- newGaugeMetric(workerDescs[st], v, labelValues...)
 		}
@@ -306,7 +311,7 @@ func (e *Exporter) collectMetrics(stats *UwsgiStats, ch chan<- prometheus.Metric
 
 		// Worker Cores
 		ch <- newGaugeMetric(workerDescs["cores"], float64(len(workerStats.Cores)), labelValues...)
-		if e.collectCores {
+		if e.CollectCores {
 			for _, coreStats := range workerStats.Cores {
 				labelValues := []string{strconv.Itoa(workerStats.ID), strconv.Itoa(coreStats.ID)}
 				ch <- newGaugeMetric(workerCoreDescs["busy"], float64(coreStats.InRequest), labelValues...)

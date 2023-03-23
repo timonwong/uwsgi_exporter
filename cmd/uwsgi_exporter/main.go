@@ -100,7 +100,11 @@ func newHandler(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
 		registry := prometheus.NewRegistry()
 
 		if *statsURI != "" {
-			registry.MustRegister(collector.New(ctx, *statsURI, metrics, *collectCores, logger))
+			registry.MustRegister(collector.New(ctx, *statsURI, metrics, collector.ExporterOptions{
+				Logger:            logger,
+				CollectCores:      *collectCores,
+				RequireSafeScheme: false,
+			}))
 		}
 
 		gatherers := prometheus.Gatherers{
@@ -133,7 +137,11 @@ func handleProbe(metrics collector.Metrics, logger log.Logger) http.HandlerFunc 
 		r = r.WithContext(ctx)
 
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(collector.New(ctx, target, metrics, *collectCores, logger))
+		registry.MustRegister(collector.New(ctx, target, metrics, collector.ExporterOptions{
+			Logger:            logger,
+			CollectCores:      *collectCores,
+			RequireSafeScheme: true,
+		}))
 
 		h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 		h.ServeHTTP(w, r)

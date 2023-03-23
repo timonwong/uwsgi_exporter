@@ -22,8 +22,7 @@ func TestUnixStatsReader_Read(t *testing.T) {
 	reader, err := NewStatsReader(uri)
 	a.NoError(err)
 
-	_, ok := reader.(*unixStatsReader)
-	a.True(ok)
+	a.IsType(&unixStatsReader{}, reader)
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()

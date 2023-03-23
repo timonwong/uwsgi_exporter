@@ -69,7 +69,11 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	logger := log.NewLogfmtLogger(os.Stderr)
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
-	exporter := New(ctx, s.URL, NewMetrics(), false, logger)
+	exporter := New(ctx, s.URL, NewMetrics(), ExporterOptions{
+		Logger:            logger,
+		CollectCores:      false,
+		RequireSafeScheme: false,
+	})
 
 	ch := make(chan prometheus.Metric)
 
@@ -110,7 +114,11 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	logger := log.NewLogfmtLogger(os.Stderr)
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
-	exporter := New(ctx, s.URL, NewMetrics(), true, logger)
+	exporter := New(ctx, s.URL, NewMetrics(), ExporterOptions{
+		Logger:            logger,
+		CollectCores:      true,
+		RequireSafeScheme: false,
+	})
 
 	ch := make(chan prometheus.Metric)
 

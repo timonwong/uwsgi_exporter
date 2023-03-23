@@ -15,8 +15,7 @@ func TestFileStatsReader_Read(t *testing.T) {
 	reader, err := NewStatsReader(uri)
 	a.NoError(err)
 
-	_, ok := reader.(*fileStatsReader)
-	a.True(ok)
+	a.IsType(&fileStatsReader{}, reader)
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
