@@ -3,7 +3,6 @@ package collector
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/url"
 )
 
@@ -22,7 +21,8 @@ func newUnixStatsReader(u *url.URL) StatsReader {
 }
 
 func (r *unixStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
-	conn, err := net.Dial("unix", r.filename)
+	d := newDialer()
+	conn, err := d.DialContext(ctx, "unix", r.filename)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stats from unix socket %s: %w", r.filename, err)
 	}
