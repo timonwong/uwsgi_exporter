@@ -49,16 +49,17 @@ On the prometheus side you can set a scrape config as follows
 
 ### Flags
 
-| Name                 | Description                                                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| --stats.uri          | **required** URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").                                                        |
-| --stats.timeout      | Timeout for trying to get stats from uwsgi. (default 5s)                                                                                                |
-| --collect.cores      | Whether to collect cores information per uwsgi worker. **WARNING** may cause tremendous resource utilization when using gevent engine. (default: false) |
-| --log.level          | Logging verbosity. (default: info)                                                                                                                      |
-| --web.config.file    | Path to a [web configuration file](#tls-and-basic-authentication)                                                                                       |
-| --web.listen-address | Address to listen on for web interface and telemetry. (default: ":9117")                                                                                |
-| --web.telemetry-path | Path under which to expose metrics.                                                                                                                     |
-| --version            | Print the version information.                                                                                                                          |
+| Name               | Description                                                                                                                                             |
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| stats.uri          | **required** URI for accessing uwsgi stats (currently supports: "http", "https", "unix", "tcp").                                                        |
+| stats.timeout      | Timeout for trying to get stats from uwsgi. (deprecated)                                                                                                |
+| timeout-offset     | Offset to subtract from timeout in seconds. (default 0.25)                                                                                              |
+| collect.cores      | Whether to collect cores information per uwsgi worker. **WARNING** may cause tremendous resource utilization when using gevent engine. (default: false) |
+| log.level          | Logging verbosity. (default: info)                                                                                                                      |
+| web.config.file    | Path to a [web configuration file](#tls-and-basic-authentication)                                                                                       |
+| web.listen-address | Address to listen on for web interface and telemetry. (default: ":9117")                                                                                |
+| web.telemetry-path | Path under which to expose metrics.                                                                                                                     |
+| version            | Print the version information.                                                                                                                          |
 
 ## TLS and basic authentication
 
