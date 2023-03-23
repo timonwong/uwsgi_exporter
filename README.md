@@ -30,21 +30,24 @@ To use the multi-target functionality, send an http request to the endpoint /pro
 
 On the prometheus side you can set a scrape config as follows
 
+Please note that only `http`, `https`, and `tcp` targets are supported (`file` and `unix` targets are disabled for security reasons).
+
 ```yaml
-    - job_name: uwsgi # To get metrics about the mysql exporter’s targets
-        static_configs:
-        - targets:
-          # All uwsgi hostnames to monitor.
-          - http://uwsgi1.example.com:5432
-          - http://uwsgi2.example.com:5432
-        relabel_configs:
-        - source_labels: [__address__]
-            target_label: __param_target
-        - source_labels: [__param_target]
-            target_label: instance
-        - target_label: __address__
-            # The uwsgi_exporter host:port
-            replacement: localhost:9117
+scrape_configs:
+  - job_name: uwsgi # To get metrics about the mysql exporter’s targets
+    static_configs:
+      - targets:
+        # All uwsgi hostnames to monitor.
+        - http://uwsgi1.example.com:5432
+        - http://uwsgi2.example.com:5432
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        # The uwsgi_exporter host:port
+        replacement: localhost:9117
 ```
 
 ### Flags

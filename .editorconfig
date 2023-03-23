@@ -17,7 +17,7 @@ indent_size = 4
 [Makefile]
 indent_style = tab
 
-[Makefile.*]
+[Makefile.common]
 indent_style = tab
 
 [*.{yml,yaml}]
@@ -28,4 +28,7 @@ indent_style = tab
 
 [*.golden]
 trim_trailing_whitespace = false
+insert_final_newline = false
+
+[VERSION]
 insert_final_newline = false
