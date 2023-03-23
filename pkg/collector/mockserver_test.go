@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package exporter
+package collector
 
 import (
 	"fmt"
 	"net"
 	"os"
 	"sync"
+	"testing"
 	"time"
 )
 
@@ -17,7 +18,7 @@ import (
 // It isn't actually used for testing timeouts.
 const someTimeout = 10 * time.Second
 
-// testUnixAddr uses ioutil.TempFile to get a name that is unique.
+// testUnixAddr uses os.CreateTemp to get a name that is unique.
 // It also uses /tmp directory in case it is prohibited to create UNIX
 // sockets in TMPDIR.
 func testUnixAddr() string {
@@ -43,23 +44,22 @@ func newLocalListener(network string) (net.Listener, error) {
 }
 
 type localServer struct {
-	lnmu sync.RWMutex
+	mu sync.RWMutex
 	net.Listener
 
-	done chan bool // signal that indicates server stopped
+	done chan struct{} // signal that indicates server stopped
 }
 
-func (ls *localServer) buildup(handler func(*localServer, net.Listener)) error {
+func (ls *localServer) buildup(handler func(*localServer, net.Listener)) {
 	go func() {
 		handler(ls, ls.Listener)
 		close(ls.done)
 	}()
-	return nil
 }
 
 func (ls *localServer) teardown() error {
-	ls.lnmu.Lock()
-	defer ls.lnmu.Unlock()
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
 
 	if ls.Listener != nil {
 		network := ls.Listener.Addr().Network()
@@ -74,15 +74,20 @@ func (ls *localServer) teardown() error {
 	return nil
 }
 
-func newLocalServer(network string) (*localServer, error) {
+func newLocalServer(t *testing.T, network string) (*localServer, error) {
 	ln, err := newLocalListener(network)
 	if err != nil {
 		return nil, err
 	}
-	return &localServer{Listener: ln, done: make(chan bool)}, nil
+
+	s := &localServer{Listener: ln, done: make(chan struct{})}
+	t.Cleanup(func() {
+		s.teardown()
+	})
+	return s, nil
 }
 
-func justwriteHandler(content []byte, ch chan<- error) func(*localServer, net.Listener) {
+func justWriteHandler(content []byte, ch chan<- error) func(*localServer, net.Listener) {
 	return func(ls *localServer, ln net.Listener) {
 		defer close(ch)
 

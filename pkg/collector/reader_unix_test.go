@@ -1,31 +1,35 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUnixStatsReader_Read(t *testing.T) {
+	t.Parallel()
+
 	a := assert.New(t)
 
 	// Setup a local UDS server for testing
-	ls, err := newLocalServer("unix")
+	ls, err := newLocalServer(t, "unix")
 	a.NoError(err)
 
-	defer ls.teardown()
 	ch := make(chan error, 1)
 
-	ls.buildup(justwriteHandler(sampleUwsgiStatsJSON, ch))
+	ls.buildup(justWriteHandler(sampleUwsgiStatsJSON, ch))
 
 	uri := "unix://" + ls.Listener.Addr().String()
-	reader, err := NewStatsReader(uri, someTimeout)
+	reader, err := NewStatsReader(uri)
 	a.NoError(err)
 
-	_, ok := reader.(*unixStatsReader)
-	a.True(ok)
+	a.IsType(&unixStatsReader{}, reader)
 
-	uwsgiStats, err := reader.Read()
+	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
+	defer cancel()
+
+	uwsgiStats, err := reader.Read(ctx)
 	a.NoError(err)
 
 	a.Equal(uwsgiStats.Version, "2.0.12")

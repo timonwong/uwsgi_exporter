@@ -1,10 +1,10 @@
-package exporter
+package collector
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
-	"time"
 )
 
 type fileStatsReader struct {
@@ -15,14 +15,14 @@ func init() {
 	registerStatsReaderFunc("file", newFileStatsReader)
 }
 
-func newFileStatsReader(u *url.URL, timeout time.Duration) StatsReader {
+func newFileStatsReader(u *url.URL) StatsReader {
 	return &fileStatsReader{
 		filename: u.Path,
 	}
 }
 
-func (reader *fileStatsReader) Read() (*UwsgiStats, error) {
-	f, err := os.Open(reader.filename)
+func (r *fileStatsReader) Read(_ context.Context) (*UwsgiStats, error) {
+	f, err := os.Open(r.filename)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open file: %w", err)
 	}
