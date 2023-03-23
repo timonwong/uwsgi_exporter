@@ -18,10 +18,12 @@ build:
 tarball:
   files:
     - LICENSE
-    - darwin/amd64
-    - darwin/arm64
-    - windows/amd64
-    - windows/arm64
-    - windows/386
-    - linux/amd64
-    - linux/arm64
+crossbuild:
+  platforms:
+    - darwin
+    - dragonfly
+    - freebsd
+    - illumos
+    - linux
+    - netbsd
+    - windows
