@@ -3,14 +3,11 @@ package collector
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/url"
-	"time"
 )
 
 type tcpStatsReader struct {
-	host    string
-	timeout time.Duration
+	host string
 }
 
 func init() {
@@ -24,16 +21,8 @@ func newTCPStatsReader(u *url.URL) StatsReader {
 }
 
 func (r *tcpStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
-	var (
-		err  error
-		conn net.Conn
-	)
-
-	if r.timeout == 0 {
-		conn, err = net.Dial("tcp", r.host)
-	} else {
-		conn, err = net.DialTimeout("tcp", r.host, r.timeout)
-	}
+	d := newDialer()
+	conn, err := d.DialContext(ctx, "tcp", r.host)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stats from tcp: %w", err)
 	}
