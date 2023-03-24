@@ -2,28 +2,27 @@ package collector
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/alecthomas/assert/v2"
 )
 
 func TestFileStatsReader_Read(t *testing.T) {
 	t.Parallel()
 
-	a := assert.New(t)
-
 	uri := "file://" + sampleUwsgiStatsFileName
 
 	reader, err := NewStatsReader(uri)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.IsType(&fileStatsReader{}, reader)
+	assert.Equal(t, reflect.TypeOf(&fileStatsReader{}).String(), reflect.TypeOf(reader).String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
 
 	uwsgiStats, err := reader.Read(ctx)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.Equal(uwsgiStats.Version, "2.0.12")
+	assert.Equal(t, uwsgiStats.Version, "2.0.12")
 }

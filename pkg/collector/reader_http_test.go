@@ -2,30 +2,29 @@ package collector
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/alecthomas/assert/v2"
 )
 
 func TestHTTPStatsReader_Read(t *testing.T) {
 	t.Parallel()
-
-	a := assert.New(t)
 
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
 	defer s.Close()
 
 	uri := s.URL
 	reader, err := NewStatsReader(uri)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.IsType(&httpStatsReader{}, reader)
+	assert.Equal(t, reflect.TypeOf(&httpStatsReader{}).String(), reflect.TypeOf(reader).String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
 
 	uwsgiStats, err := reader.Read(ctx)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.Equal(uwsgiStats.Version, "2.0.12")
+	assert.Equal(t, "2.0.12", uwsgiStats.Version)
 }
