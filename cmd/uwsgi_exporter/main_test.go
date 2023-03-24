@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/alecthomas/assert/v2"
 )
 
 // bin stores information about path of executable and attached port
@@ -43,18 +43,7 @@ type bin struct {
 func TestBin(t *testing.T) {
 	var err error
 	binName := "uwsgi_exporter"
-
-	binDir, err := os.MkdirTemp("/tmp", binName+"-test-bindir-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll(binDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	binDir := t.TempDir()
 	importpath := "github.com/prometheus/common"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
@@ -77,9 +66,7 @@ func TestBin(t *testing.T) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
-	if err != nil {
-		t.Fatalf("Failed to build: %s", err)
-	}
+	assert.NoError(t, err)
 
 	tests := []func(*testing.T, bin){
 		testLanding,
@@ -127,9 +114,7 @@ func testLanding(t *testing.T, data bin) {
 	// Get the main page.
 	urlToGet := fmt.Sprintf("http://127.0.0.1:%d", data.port)
 	body, err := waitForBody(urlToGet)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	got := string(body)
 
 	assert.Equal(t, landingHTMLData, got)
@@ -155,16 +140,12 @@ func testProbe(t *testing.T, data bin) {
 	// Get the main page.
 	urlToGet := fmt.Sprintf("http://127.0.0.1:%d/probe", data.port)
 	body, err := waitForBody(urlToGet)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	got := strings.TrimSpace(string(body))
 
 	expected := `target is required`
 
-	if got != expected {
-		t.Fatalf("got '%s' but expected '%s'", got, expected)
-	}
+	assert.Equal(t, expected, got)
 }
 
 // waitForBody is a helper function which makes http calls until http server is up

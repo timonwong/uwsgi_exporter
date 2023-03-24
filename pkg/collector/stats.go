@@ -27,7 +27,7 @@ type UwsgiWorker struct {
 	Status        string      `json:"status"`
 	RSS           int         `json:"rss"`
 	VSZ           int         `json:"vsz"`
-	RunningTime   int         `json:"running_time"`
+	RunningTime   int64       `json:"running_time"`
 	LastSpawn     int64       `json:"last_spawn"`
 	RespawnCount  int         `json:"respawn_count"`
 	TX            int         `json:"tx"`
@@ -39,7 +39,7 @@ type UwsgiWorker struct {
 type UwsgiApp struct {
 	ID          int    `json:"id"`
 	Modifier1   int    `json:"modifier1"`
-	Mountpoint  string `json:"mountpoint"`
+	MountPoint  string `json:"mountpoint"`
 	StartupTime int    `json:"startup_time"`
 	Requests    int    `json:"requests"`
 	Exceptions  int    `json:"exceptions"`

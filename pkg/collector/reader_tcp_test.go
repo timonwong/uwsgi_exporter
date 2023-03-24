@@ -2,19 +2,18 @@ package collector
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/alecthomas/assert/v2"
 )
 
 func TestTCPStatsReader_Read(t *testing.T) {
 	t.Parallel()
 
-	a := assert.New(t)
-
 	// Setup a local TCP server for testing
 	ls, err := newLocalServer(t, "tcp")
-	a.NoError(err)
+	assert.NoError(t, err)
 
 	ch := make(chan error, 1)
 
@@ -22,19 +21,19 @@ func TestTCPStatsReader_Read(t *testing.T) {
 
 	uri := "tcp://" + ls.Listener.Addr().String()
 	reader, err := NewStatsReader(uri)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.IsType(&tcpStatsReader{}, reader)
+	assert.Equal(t, reflect.TypeOf(&tcpStatsReader{}).String(), reflect.TypeOf(reader).String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
 
 	uwsgiStats, err := reader.Read(ctx)
-	a.NoError(err)
+	assert.NoError(t, err)
 
-	a.Equal(uwsgiStats.Version, "2.0.12")
+	assert.Equal(t, "2.0.12", uwsgiStats.Version)
 
 	for err := range ch {
-		a.NoError(err)
+		assert.NoError(t, err)
 	}
 }

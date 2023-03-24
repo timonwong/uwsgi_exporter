@@ -9,12 +9,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alecthomas/assert/v2"
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -74,7 +73,7 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	defer cancel()
 
 	statsReader, err := NewStatsReader(s.URL)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	exporter := New(ctx, s.URL, statsReader, NewMetrics(), ExporterOptions{
 		Logger:       logger,
@@ -122,7 +121,7 @@ func TestUwsgiExporter_Collect(t *testing.T) {
 	defer cancel()
 
 	statsReader, err := NewStatsReader(s.URL)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	exporter := New(ctx, s.URL, statsReader, NewMetrics(), ExporterOptions{
 		Logger:       logger,

@@ -3,13 +3,12 @@ package collector
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/alecthomas/assert/v2"
 )
 
 func TestNewStatsReaderNil(t *testing.T) {
 	t.Parallel()
 
-	a := assert.New(t)
 	unknownUris := []string{
 		"abc://xxx",
 		"def://yyy",
@@ -18,9 +17,8 @@ func TestNewStatsReaderNil(t *testing.T) {
 
 	for _, uri := range unknownUris {
 		reader, err := NewStatsReader(uri)
-		if a.Error(err) {
-			a.Nil(reader)
-		}
+		assert.Equal(t, nil, reader)
+		assert.Error(t, err)
 	}
 }
 
