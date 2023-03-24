@@ -43,18 +43,7 @@ type bin struct {
 func TestBin(t *testing.T) {
 	var err error
 	binName := "uwsgi_exporter"
-
-	binDir, err := os.MkdirTemp("/tmp", binName+"-test-bindir-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll(binDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	binDir := t.TempDir()
 	importpath := "github.com/prometheus/common"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
