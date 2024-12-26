@@ -40,6 +40,7 @@ scrape_configs:
         # All uwsgi hostnames to monitor.
         - http://uwsgi1.example.com:5432
         - http://uwsgi2.example.com:5432
+    metrics_path: "/probe"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

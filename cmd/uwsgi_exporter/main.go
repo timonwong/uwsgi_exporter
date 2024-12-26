@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof" //#nosec
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -70,7 +71,7 @@ func main() {
 		}
 		http.Handle("/", landingPage)
 	}
-	http.HandleFunc("/probe", handleProbe(collector.NewMetrics(), logger))
+	http.HandleFunc("/probe", handleProbe(logger))
 	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		io.WriteString(w, "ok")
@@ -123,7 +124,9 @@ func newHandler(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
 	}
 }
 
-func handleProbe(metrics collector.Metrics, logger log.Logger) http.HandlerFunc {
+func handleProbe(logger log.Logger) http.HandlerFunc {
+	// Create a metrics map to store metrics for an specific target.
+	var metricsMap = sync.Map{}
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		target := params.Get("target")
@@ -131,6 +134,16 @@ func handleProbe(metrics collector.Metrics, logger log.Logger) http.HandlerFunc 
 			http.Error(w, "target is required", http.StatusBadRequest)
 			return
 		}
+
+		var metrics collector.Metrics
+		// Check if metrics for the target already exist.
+		val, ok := metricsMap.Load(target)
+		if !ok {
+			// Create new metrics and store it in the metrics map.
+			metrics = collector.NewMetrics()
+			val, _ = metricsMap.LoadOrStore(target, metrics)
+		}
+		metrics = val.(collector.Metrics)
 
 		timeoutSeconds, err := getTimeout(r, *timeoutOffset, logger)
 		if err != nil {
