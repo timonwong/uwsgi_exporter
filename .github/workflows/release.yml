@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: "Build executables with Promu & Docker images"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - uses: actions/checkout@v4
+      - run: wget https://github.com/prometheus/promu/releases/download/v0.17.0/promu-0.17.0.linux-amd64.tar.gz
+      - run: tar xzf promu-0.17.0.linux-amd64.tar.gz
+      - run: ./promu-0.17.0.linux-amd64/promu crossbuild
+      - run: make common-docker
+      - run: |
+          docker image ls --filter label=maintainer="Timon Wong <timon86.wang@gmail.com>"  --format "{{ .Repository }}:{{ .Tag }}" | while IFS= read -r img
+          do
+            echo "IMG: ${img}"
+            IFS='/' read -r -a array <<< "${img}"
+            name_tag="${array[1]}"
+            IFS=':' read -r -a array <<< "${name_tag}"
+            name="${array[0]}"
+            tag="${{ github.ref_name }}"
+            docker tag ${img} "ghcr.io/oduludo/${name}:${tag}"
+            docker push "ghcr.io/oduludo/${name}:${tag}"
+          done
