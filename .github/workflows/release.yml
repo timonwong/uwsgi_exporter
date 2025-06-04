@@ -29,3 +29,10 @@ jobs:
             docker tag ${img} "ghcr.io/oduludo/${name}:${tag}"
             docker push "ghcr.io/oduludo/${name}:${tag}"
           done
+      - run: |
+          name="uwsgi-exporter-linux-amd64"
+          tag="${{ github.ref_name }}"
+          docker tag "ghcr.io/oduludo/${name}:${tag}" "ghcr.io/oduludo/uwsgi-exporter:${tag}"
+          docker push "ghcr.io/oduludo/uwsgi-exporter:${tag}"
+          docker tag "ghcr.io/oduludo/uwsgi-exporter:${tag}" "ghcr.io/oduludo/uwsgi-exporter:latest"
+          docker push "ghcr.io/oduludo/uwsgi-exporter:latest"
