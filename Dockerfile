@@ -1,7 +1,7 @@
 ARG ARCH="amd64"
 ARG OS="linux"
 
-FROM quay.io/prometheus/busybox-${OS}-${ARCH}:latest
+FROM --platform=${OS}/${ARCH} quay.io/prometheus/busybox-${OS}-${ARCH}:latest
 LABEL maintainer="Timon Wong <timon86.wang@gmail.com>"
 
 ARG ARCH="amd64"

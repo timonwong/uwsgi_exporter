@@ -3,14 +3,13 @@ package collector
 import (
 	"context"
 	_ "embed"
+	"github.com/prometheus/common/promslog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/alecthomas/assert/v2"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/samber/lo"
@@ -68,7 +67,7 @@ func readMetric(m prometheus.Metric) MetricResult {
 
 func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 	s := newUwsgiStatsServer(wrongUwsgiStatsJSON)
-	logger := log.NewLogfmtLogger(os.Stderr)
+	logger := promslog.New(&promslog.Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
 
@@ -116,7 +115,7 @@ func TestUwsgiExporter_CollectWrongJSON(t *testing.T) {
 
 func TestUwsgiExporter_Collect(t *testing.T) {
 	s := newUwsgiStatsServer(sampleUwsgiStatsJSON)
-	logger := log.NewLogfmtLogger(os.Stderr)
+	logger := promslog.New(&promslog.Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), someTimeout)
 	defer cancel()
 
