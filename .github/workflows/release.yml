@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - '*'
+  release:
+    types:
+      - released
+#  push:
+#    tags:
+#      - '*'
 
 jobs:
   build:
