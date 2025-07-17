@@ -33,13 +33,24 @@ func (r *httpStatsReader) Read(ctx context.Context) (*UwsgiStats, error) {
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error querying uwsgi stats: %w", err)
+		return nil, fmt.Errorf("error querying uwsgi stats from %s: %w", r.uri, err)
 	}
 	defer resp.Body.Close()
 
+	// 检查 HTTP 状态码
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("uwsgi stats endpoint returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// 检查 Content-Type
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		return nil, fmt.Errorf("unexpected content type: %s, expected application/json", contentType)
+	}
+
 	uwsgiStats, err := parseUwsgiStatsFromIO(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse uwsgi stats: %w", err)
+		return nil, fmt.Errorf("failed to parse uwsgi stats from %s: %w", r.uri, err)
 	}
 	return uwsgiStats, nil
 }
